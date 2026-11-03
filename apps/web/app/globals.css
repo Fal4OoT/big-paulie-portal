@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: #120d0b;
+  color: #f1e6cf;
+}
+
+body {
+  /* Lueur de crépuscule discrète, comme sur l'affiche de Sandy Shores */
+  background-image:
+    radial-gradient(1200px 500px at 85% -10%, rgba(224, 122, 47, 0.10), transparent 60%),
+    radial-gradient(900px 400px at -10% 110%, rgba(31, 90, 58, 0.10), transparent 60%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(217, 164, 65, 0.35);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85) sepia(0.3);
+}
+
+/* Barre de défilement sobre */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3027 transparent;
+}
+
+.table-bp {
+  @apply w-full text-left text-sm;
+}
+.table-bp th {
+  @apply border-b border-night-500 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-cream-muted;
+}
+.table-bp td {
+  @apply border-b border-night-600/70 px-3 py-2.5 align-middle;
+}
+.table-bp tbody tr {
+  @apply transition-colors hover:bg-night-700/60;
+}

@@ -1,0 +1,75 @@
+# Big Paulie Portal — stack autonome.
+# Le nom de projet "bigpaulie" isole conteneurs, réseau et volumes de toute autre stack
+# présente sur le VPS (ex : le portail Police Academy).
+name: bigpaulie
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bigpaulie
+      POSTGRES_USER: bigpaulie
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bigpaulie -d bigpaulie"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./apps/api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: Host=db;Port=5432;Database=bigpaulie;Username=bigpaulie;Password=${POSTGRES_PASSWORD}
+      PUBLIC_URL: ${PUBLIC_URL:?PUBLIC_URL manquant dans .env}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
+      ADMIN_DISCORD_IDS: ${ADMIN_DISCORD_IDS:-}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY manquant dans .env}
+      PORTAL_TIMEZONE: ${PORTAL_TIMEZONE:-Europe/Paris}
+    volumes:
+      - api-keys:/keys
+
+  web:
+    build: ./apps/web
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  bot:
+    build: ./apps/bot
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
+      API_INTERNAL_URL: http://api:8080
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      PUBLIC_URL: ${PUBLIC_URL}
+
+  # Point d'entrée unique : /api -> api, le reste -> web.
+  # Écoute en local uniquement ; le reverse proxy HTTPS du VPS pointe dessus (voir docs/DEPLOIEMENT.md).
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - web
+    ports:
+      - "${BP_BIND:-127.0.0.1}:${BP_HTTP_PORT:-8081}:80"
+    volumes:
+      - ./deploy/Caddyfile.gateway:/etc/caddy/Caddyfile:ro
+
+volumes:
+  db-data:
+  api-keys:
