@@ -115,6 +115,7 @@ public sealed class SaleView
     public bool RequiresPlate { get; set; }
     public decimal Price { get; set; }
     public bool Immediate { get; set; }
+    public bool FromStock { get; set; }
     public string? Plate { get; set; }
     public string Status { get; set; } = "";
     public bool PermitWarning { get; set; }

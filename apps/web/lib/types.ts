@@ -107,6 +107,8 @@ export interface Sale {
   requiresPlate: boolean;
   price: number;
   immediate: boolean;
+  /** Vendu depuis le stock : la vente a démarré en « Réceptionné ». */
+  fromStock: boolean;
   plate: string | null;
   status: StatusCode;
   permitWarning: boolean;

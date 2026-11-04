@@ -3,7 +3,7 @@
 import { AlertTriangle } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
-import { usePortal } from "@/lib/portal-context";
+import { usePortal, useStatus } from "@/lib/portal-context";
 import type { DataRecord, Sale } from "@/lib/types";
 import { DynamicFields } from "./DynamicFields";
 import { Button, ErrorBox, Input, Label, Modal, Select, Toggle } from "./ui";
@@ -25,10 +25,12 @@ export function SaleFormModal({
   sale?: Sale;
 }) {
   const { config } = usePortal();
+  const status = useStatus();
   const [vehicleName, setVehicleName] = useState(sale?.vehicleName ?? "");
   const [typeId, setTypeId] = useState(sale?.vehicleTypeId ?? "");
   const [price, setPrice] = useState(sale ? String(sale.price) : "");
   const [immediate, setImmediate] = useState(sale?.immediate ?? false);
+  const [inStock, setInStock] = useState(false);
   const [plate, setPlate] = useState(sale?.plate ?? "");
   const [data, setData] = useState<DataRecord>(sale?.data ?? {});
   const [saving, setSaving] = useState(false);
@@ -61,7 +63,16 @@ export function SaleFormModal({
 
     setSaving(true);
     try {
-      const body = { clientId, vehicleName, vehicleTypeId: typeId, price: p, immediate, plate: requiresPlate ? plate || null : null, data };
+      const body = {
+        clientId,
+        vehicleName,
+        vehicleTypeId: typeId,
+        price: p,
+        immediate: inStock ? false : immediate,
+        inStock: sale ? undefined : inStock,
+        plate: requiresPlate ? plate || null : null,
+        data,
+      };
       if (sale) {
         await api.put(`/api/sales/${sale.id}`, body);
         onSaved(sale.id);
@@ -117,8 +128,20 @@ export function SaleFormModal({
               <Input id="plate" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} maxLength={16} required />
             </div>
           )}
-          <div className="flex items-end sm:col-span-2">
-            <Toggle checked={immediate} onChange={setImmediate} label="Le client veut le véhicule immédiatement (on part le chercher tout de suite)" />
+          <div className="space-y-3 sm:col-span-2">
+            {!sale && (
+              <Toggle
+                checked={inStock}
+                onChange={(v) => {
+                  setInStock(v);
+                  if (v) setImmediate(false);
+                }}
+                label={`Véhicule en stock à la concession (la vente passe directement en « ${status("RECEIVED").label} »)`}
+              />
+            )}
+            {!inStock && !sale?.fromStock && (
+              <Toggle checked={immediate} onChange={setImmediate} label="Le client veut le véhicule immédiatement (on part le chercher tout de suite)" />
+            )}
           </div>
         </div>
 

@@ -130,6 +130,7 @@ export default function SalePage() {
                     {ev.actorName ?? "—"} · {formatDateTime(ev.at)}
                   </div>
                 )}
+                {done && !ev && sale.fromStock && <div className="mt-1 text-xs text-cream-dim">Non nécessaire (en stock)</div>}
               </li>
             );
           })}
@@ -187,7 +188,9 @@ export default function SalePage() {
             <Info label="Type">
               {sale.vehicleTypeLabel} · {sale.categoryLabel}
             </Info>
-            <Info label="Livraison">{sale.immediate ? "Immédiate (on part le chercher)" : "Prochaine tournée"}</Info>
+            <Info label="Provenance">
+              {sale.fromStock ? "En stock à la concession" : sale.immediate ? "Immédiate (on part le chercher)" : "Prochaine tournée"}
+            </Info>
             <Info label="Plaque">
               {!sale.requiresPlate ? (
                 <span className="text-cream-dim">Sans plaque ({sale.categoryLabel.toLowerCase()})</span>

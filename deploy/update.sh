@@ -93,7 +93,7 @@ ok "Branche $BRANCH, aucune modification locale"
 
 # ---------- 2. Nouveautés ----------
 step "Recherche des nouveautés sur GitHub"
-git fetch --quiet origin "$BRANCH"
+git fetch --quiet --tags origin "$BRANCH"
 OLD_COMMIT="$(git rev-parse HEAD)"
 NEW_COMMIT="$(git rev-parse "origin/$BRANCH")"
 
@@ -174,4 +174,5 @@ docker image prune -f >/dev/null
 ok "Anciennes images Docker supprimées"
 
 trap - ERR
-printf '\n%s✔ Mise à jour terminée%s · version %s\n\n' "$G" "$N" "$(git log -1 --format='%h (%cd)' --date=format:'%d/%m/%Y %H:%M')"
+VERSION="$(git describe --tags --always 2>/dev/null || git log -1 --format=%h)"
+printf '\n%s✔ Mise à jour terminée%s · version %s · %s\n\n' "$G" "$N" "$VERSION" "$(git log -1 --format='%cd' --date=format:'%d/%m/%Y %H:%M')"

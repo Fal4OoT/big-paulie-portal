@@ -5,7 +5,7 @@ import Link from "next/link";
 import { formatMoney, formatPhone, formatRelative } from "@/lib/format";
 import type { Sale } from "@/lib/types";
 import { ImmediateBadge, StatusBadge } from "./StatusBadge";
-import { Empty } from "./ui";
+import { Badge, Empty } from "./ui";
 
 export function SalesTable({ sales, hideClient, empty = "Aucune vente." }: { sales: Sale[]; hideClient?: boolean; empty?: string }) {
   if (sales.length === 0) return <Empty>{empty}</Empty>;
@@ -56,6 +56,7 @@ export function SalesTable({ sales, hideClient, empty = "Aucune vente." }: { sal
                 <div className="flex flex-wrap items-center gap-1.5">
                   <StatusBadge status={s.status} />
                   {s.immediate && (s.status === "TO_ORDER" || s.status === "TO_FETCH") && <ImmediateBadge />}
+                  {s.fromStock && s.status === "RECEIVED" && <Badge color="#3C8D5E">En stock</Badge>}
                 </div>
               </td>
               <td className="text-right tabular-nums">{formatMoney(s.price)}</td>

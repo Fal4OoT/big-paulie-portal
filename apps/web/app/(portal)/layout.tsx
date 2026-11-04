@@ -1,11 +1,12 @@
 "use client";
 
-import { Car, ClipboardList, LayoutDashboard, LogOut, Menu, ScrollText, Settings, Truck, Users, X } from "lucide-react";
+import { Car, ClipboardList, LayoutDashboard, LogOut, Menu, ScrollText, Settings, Sparkles, Truck, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Spinner } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
+import { CURRENT_VERSION, SEEN_VERSION_KEY } from "@/lib/changelog";
 import { cn } from "@/lib/format";
 import { PERM, PortalContext } from "@/lib/portal-context";
 import type { Me, PortalConfig } from "@/lib/types";
@@ -25,6 +26,21 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<PortalConfig | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unseen, setUnseen] = useState(false);
+
+  // Point « nouveau » tant que la version actuelle n'a pas été consultée.
+  useEffect(() => {
+    const check = () => {
+      try {
+        setUnseen(localStorage.getItem(SEEN_VERSION_KEY) !== CURRENT_VERSION);
+      } catch {
+        setUnseen(false);
+      }
+    };
+    check();
+    window.addEventListener("bp:seen-version", check);
+    return () => window.removeEventListener("bp:seen-version", check);
+  }, []);
 
   const reloadConfig = useCallback(async () => {
     setConfig(await api.get<PortalConfig>("/api/config"));
@@ -95,6 +111,22 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
           </Link>
         ))}
       </nav>
+
+      <div className="px-3 pb-3">
+        <Link
+          href="/nouveautes"
+          className={cn(
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+            pathname.startsWith("/nouveautes") ? "bg-night-700 text-cream" : "text-cream-muted hover:bg-night-700 hover:text-cream",
+          )}
+        >
+          <Sparkles className="h-4 w-4" />
+          Nouveautés
+          <span className="ml-auto flex items-center gap-1.5 font-mono text-xs text-cream-dim">
+            {unseen && <span className="h-2 w-2 rounded-full bg-sunset" aria-label="Nouvelle version" />}v{CURRENT_VERSION}
+          </span>
+        </Link>
+      </div>
 
       <div className="border-t border-night-500/70 p-4">
         <div className="flex items-center gap-3">

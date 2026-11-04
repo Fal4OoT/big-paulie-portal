@@ -1,5 +1,7 @@
 # Big Paulie · Portail logistique
 
+Version actuelle : voir [CHANGELOG.md](CHANGELOG.md) (aussi visible dans le portail, menu **Nouveautés**).
+
 Portail web + bot Discord de la concession **Big Paulie Budget Cars** (Sandy Shores) : comptes clients, ventes et suivi logistique des véhicules terrestres, maritimes et aériens, de la commande à la livraison.
 
 Dépôt **autonome** : il ne dépend d'aucun autre projet (notamment pas du portail Police Academy), même s'il tourne sur le même VPS.
@@ -24,6 +26,7 @@ Dépôt **autonome** : il ne dépend d'aucun autre projet (notamment pas du port
 - **Détection des doublons** (même prénom + nom, renforcée si même date de naissance) avec confirmation explicite.
 - **Ventes** : nom du véhicule, type → catégorie (Terrestre / Maritime / Aérien), prix, date et vendeur automatiques, option **immédiat**, champs complémentaires configurables.
   Avertissement (sans blocage) si le client n'a pas le permis correspondant au type.
+- **Véhicule en stock** : la vente démarre directement en « Réceptionné · à livrer ».
 - **Circuit** : À commander → À chercher → Réceptionné · à livrer → Livré. **Plaque obligatoire** (majuscules, unique) pour les catégories qui en ont (Terrestre par défaut) ; maritime et aérien sans plaque. Annulation / rétablissement.
   Libellés et couleurs des statuts configurables.
 - **Historique** de chaque vente : qui a fait quoi, à chaque étape, et quand.

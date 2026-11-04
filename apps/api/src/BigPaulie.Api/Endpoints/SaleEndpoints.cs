@@ -19,6 +19,8 @@ public static class SaleEndpoints
         public Guid VehicleTypeId { get; set; }
         public decimal? Price { get; set; }
         public bool Immediate { get; set; }
+        /// <summary>Véhicule déjà en stock : la vente démarre en « Réceptionné · à livrer » (création uniquement).</summary>
+        public bool InStock { get; set; }
         public string? Plate { get; set; }
         public JsonObject? Data { get; set; }
     }
@@ -41,7 +43,7 @@ public static class SaleEndpoints
                trim(coalesce(c.data->>'prenom','') || ' ' || coalesce(c.data->>'nom','')) AS client_name,
                c.data->>'telephone' AS client_phone,
                s.vehicle_name, s.vehicle_type_id, vt.label AS vehicle_type_label, vc.label AS category_label, vc.requires_plate,
-               s.price, s.immediate, s.plate, s.status, s.permit_warning, s.data::text AS data_json,
+               s.price, s.immediate, s.from_stock, s.plate, s.status, s.permit_warning, s.data::text AS data_json,
                s.seller_id, u.display_name AS seller_name, s.created_at, s.updated_at, s.delivered_at
         FROM sales s
         JOIN clients c ON c.id = s.client_id
@@ -65,6 +67,7 @@ public static class SaleEndpoints
         s.RequiresPlate,
         s.Price,
         s.Immediate,
+        s.FromStock,
         s.Plate,
         s.Status,
         s.PermitWarning,
@@ -147,16 +150,23 @@ public static class SaleEndpoints
 
             var warning = HasPermitWarning(type, client);
 
+            // En stock : rien à commander ni à aller chercher, la vente est directement à livrer.
+            var inStock = input.InStock;
+            var immediate = !inStock && input.Immediate;
+            var status = inStock ? SaleStatus.Received : SaleStatus.ToOrder;
+            var note = inStock ? "Véhicule en stock : directement à livrer"
+                     : immediate ? "Client veut le véhicule immédiatement" : null;
+
             await using var tx = await c.BeginTransactionAsync();
             var created = await c.QuerySingleAsync<(Guid Id, long Number)>("""
-                INSERT INTO sales (client_id, vehicle_name, vehicle_type_id, price, immediate, status, permit_warning, data, seller_id)
-                VALUES (@clientId, @name, @typeId, @price, @immediate, 'TO_ORDER', @warning, @data::jsonb, @me)
+                INSERT INTO sales (client_id, vehicle_name, vehicle_type_id, price, immediate, from_stock, status, permit_warning, data, seller_id)
+                VALUES (@clientId, @name, @typeId, @price, @immediate, @inStock, @status, @warning, @data::jsonb, @me)
                 RETURNING id, number
-                """, new { clientId = input.ClientId, name, typeId = type.Id, price = Math.Round(input.Price.Value, 2), immediate = input.Immediate, warning, data = v.Data.ToJsonString(), me = me.Id }, tx);
+                """, new { clientId = input.ClientId, name, typeId = type.Id, price = Math.Round(input.Price.Value, 2), immediate, inStock, status, warning, data = v.Data.ToJsonString(), me = me.Id }, tx);
             await c.ExecuteAsync("""
                 INSERT INTO sale_events (sale_id, action, to_status, note, actor_id)
-                VALUES (@id, 'CREATED', 'TO_ORDER', @note, @me)
-                """, new { id = created.Id, note = input.Immediate ? "Client veut le véhicule immédiatement" : null, me = me.Id }, tx);
+                VALUES (@id, 'CREATED', @status, @note, @me)
+                """, new { id = created.Id, status, note, me = me.Id }, tx);
             await tx.CommitAsync();
 
             var reference = Ref(created.Number);
@@ -166,11 +176,11 @@ public static class SaleEndpoints
 
             await audit.LogAsync(me, "sale.created", "sale", created.Id.ToString(), $"Nouvelle vente {reference}",
                 $"**{name}** ({type.Label} · {categoryLabel}) pour **{clientName}** — {Money(input.Price.Value)}" +
-                (input.Immediate ? "\n⚡ **Immédiat**" : "\n🕒 Prochaine tournée") +
+                (inStock ? "\n📦 **En stock** : directement à livrer" : immediate ? "\n⚡ **Immédiat**" : "\n🕒 Prochaine tournée") +
                 (warning ? "\n⚠️ Permis correspondant non renseigné" : ""),
                 $"/ventes/{created.Id}");
 
-            if (input.Immediate)
+            if (immediate)
             {
                 var settings = await config.GetSettingsAsync();
                 var role = settings.ImmediatePingRoleId;
@@ -182,7 +192,7 @@ public static class SaleEndpoints
                     pingRoleIds: string.IsNullOrEmpty(role) ? null : new[] { role }));
             }
 
-            return Results.Ok(new { id = created.Id, number = created.Number, reference, permitWarning = warning });
+            return Results.Ok(new { id = created.Id, number = created.Number, reference, status, permitWarning = warning });
         }).RequirePerm(Permissions.SalesCreate);
 
         g.MapPut("/{id:guid}", async (Guid id, SaleInput input, HttpContext http, NpgsqlDataSource db, ConfigService config, AuditService audit) =>
