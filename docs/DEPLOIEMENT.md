@@ -91,10 +91,12 @@ Plus rapide, mais crée une dépendance **temporaire** : si la stack PA est arr�
 ## Mise à jour
 
 ```bash
-cd big-paulie-portal
-git pull
-docker compose up -d --build
+~/big-paulie-portal/deploy/update.sh
 ```
+
+Le script vérifie le dépôt, sauvegarde la base (`~/backups/bigpaulie/bp-avant-maj-*.dump`, gardées 30 jours), récupère le code, reconstruit les conteneurs, contrôle que le portail répond et nettoie les anciennes images. En cas d'échec, il affiche les commandes de retour arrière.
+
+Options : `--forcer` (reconstruit même sans nouveauté), `--sans-sauvegarde`, `--aide`.
 
 Les migrations de base s'appliquent toutes seules au redémarrage de l'API.
 

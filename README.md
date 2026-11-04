@@ -12,6 +12,7 @@ Dépôt **autonome** : il ne dépend d'aucun autre projet (notamment pas du port
 | `apps/web` | Front Next.js 14 (App Router, TypeScript, Tailwind), DA tirée du logo |
 | `apps/bot` | Bot Discord.NET : commandes `/client`, `/vente`, `/tournee` |
 | `deploy/Caddyfile.gateway` | Routage interne de la stack (`/api` → API, le reste → front) |
+| `deploy/update.sh` | Mise à jour en une commande sur le VPS (sauvegarde, pull, rebuild, contrôle) |
 | `docs/DEPLOIEMENT.md` | Mise en production sur le VPS, à côté du portail PA |
 
 ## Fonctionnalités
