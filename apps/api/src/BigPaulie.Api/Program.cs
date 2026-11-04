@@ -51,6 +51,8 @@ builder.Services.AddHttpClient<DiscordRestClient>(c => c.Timeout = TimeSpan.From
 builder.Services.AddSingleton<DiscordNotifier>();
 builder.Services.AddSingleton<ConfigService>();
 builder.Services.AddSingleton<TourService>();
+builder.Services.AddSingleton<TourBoardService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<TourBoardService>());
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddHostedService<DiscordSenderService>();

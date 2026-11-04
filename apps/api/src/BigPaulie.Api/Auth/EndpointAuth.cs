@@ -26,6 +26,10 @@ public static class EndpointAuth
         http.Items[CurrentUserService.ItemKey] as CurrentUser
         ?? throw new InvalidOperationException("RequirePerm manquant sur cet endpoint.");
 
+    /// <summary>Demande la mise à jour du tableau de tournée Discord (sans notification).</summary>
+    public static void RefreshTourBoard(this HttpContext http) =>
+        http.RequestServices.GetRequiredService<BigPaulie.Api.Services.TourBoardService>().RequestRefresh();
+
     public static IResult Forbidden(string message = "Ton grade ne permet pas cette action.") =>
         Results.Json(new { error = message }, statusCode: 403);
 

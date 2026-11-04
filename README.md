@@ -30,7 +30,7 @@ Dépôt **autonome** : il ne dépend d'aucun autre projet (notamment pas du port
 - **Circuit** : À commander → À chercher → Réceptionné · à livrer → Livré. **Plaque obligatoire** (majuscules, unique) pour les catégories qui en ont (Terrestre par défaut) ; maritime et aérien sans plaque. Annulation / rétablissement.
   Libellés et couleurs des statuts configurables.
 - **Historique** de chaque vente : qui a fait quoi, à chaque étape, et quand.
-- **Tournées** toutes les 30 min (heure de Paris, xxh00 / xxh30) : le bot publie la liste à commander / à chercher, avec mention de rôle. Une vente immédiate déclenche une alerte tout de suite.
+- **Tournées** toutes les 30 min (heure de Paris, xxh00 / xxh30) : un **tableau unique** dans le salon de tournée, mis à jour en direct, et republié à chaque tournée avec mention de rôle (notification). Une vente immédiate le republie aussitôt. **Retards** : au-delà de X tournées d'attente, le véhicule est marqué ⏰ et un grade est mentionné.
   Page Tournée avec cases à cocher et actions groupées.
 - **Logs** : toutes les actions sont enregistrées et publiées dans un salon Discord de logs.
 - **Bot** : `/client`, `/vente`, `/tournee` (réponses visibles par toi seul, droits selon tes rôles).

@@ -147,6 +147,8 @@ export interface PortalSettings {
   immediatePingRoleId: string | null;
   tourEnabled: boolean;
   tourSkipEmpty: boolean;
+  tourLateAfter: number;
+  tourLateRoleId: string | null;
   statuses: StatusSetting[];
 }
 

@@ -3,6 +3,14 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.3.0 — 04/11/2026 · Tableau de tournée unique et retards
+
+- **Amélioration** : le salon de tournée ne contient plus qu'un seul tableau, mis à jour en direct à chaque vente ou changement de statut. Fini le spam.
+- **Amélioration** : à chaque tournée, le tableau est republié en bas du salon avec la mention du rôle, pour que tout le monde reçoive la notification.
+- **Amélioration** : une vente immédiate republie le tableau avec la mention du rôle « immédiat » au lieu d'envoyer un message séparé.
+- **Nouveau** : retards. Au-delà d'un nombre de tournées réglable, le véhicule est marqué ⏰ et le grade choisi est mentionné à chaque tournée.
+- **Nouveau** : le tableau affiche aussi les véhicules réceptionnés à livrer.
+
 ## v1.2.0 — 04/11/2026 · Véhicules en stock et notes de version
 
 - **Nouveau** : option « Véhicule en stock » lors d'un achat. La vente passe directement en « Réceptionné · à livrer », sans passer par la tournée.

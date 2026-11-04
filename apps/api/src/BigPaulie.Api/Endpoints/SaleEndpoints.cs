@@ -128,7 +128,7 @@ public static class SaleEndpoints
         }).RequirePerm(Permissions.SalesView);
 
         g.MapPost("/", async (SaleInput input, HttpContext http, NpgsqlDataSource db, ConfigService config,
-            AuditService audit, DiscordNotifier notifier, PortalOptions opt) =>
+            AuditService audit) =>
         {
             var me = http.Me();
             var name = input.VehicleName?.Trim();
@@ -180,17 +180,10 @@ public static class SaleEndpoints
                 (warning ? "\n⚠️ Permis correspondant non renseigné" : ""),
                 $"/ventes/{created.Id}");
 
-            if (immediate)
-            {
-                var settings = await config.GetSettingsAsync();
-                var role = settings.ImmediatePingRoleId;
-                notifier.Enqueue(settings.TourChannelId, DiscordNotifier.Embed(
-                    $"⚡ Vente immédiate {reference}",
-                    $"**{name}** ({type.Label}) pour **{clientName}**.\nÀ commander et aller chercher **maintenant**.",
-                    DiscordNotifier.ColorOrange, footer: $"Vendu par {me.Name}", url: $"{opt.PublicUrl}/ventes/{created.Id}",
-                    content: string.IsNullOrEmpty(role) ? null : $"<@&{role}>",
-                    pingRoleIds: string.IsNullOrEmpty(role) ? null : new[] { role }));
-            }
+            // Vente immédiate : le tableau de tournée est reposté avec mention du rôle « immédiat ».
+            var board = http.RequestServices.GetRequiredService<TourBoardService>();
+            if (immediate) board.RequestRepost(TourBoardService.RepostReason.Immediate, $"{reference} · {name} ({type.Label}) pour {clientName}");
+            else board.RequestRefresh();
 
             return Results.Ok(new { id = created.Id, number = created.Number, reference, status, permitWarning = warning });
         }).RequirePerm(Permissions.SalesCreate);
@@ -257,6 +250,7 @@ public static class SaleEndpoints
 
             await audit.LogAsync(me, "sale.updated", "sale", id.ToString(), $"Vente {Ref(sale.Number)} modifiée",
                 $"**{name}** pour **{sale.ClientName}** — " + string.Join(" · ", changes), $"/ventes/{id}");
+            http.RefreshTourBoard();
             return Results.Ok(new { id });
         }).RequirePerm(Permissions.SalesEdit);
 
@@ -276,6 +270,7 @@ public static class SaleEndpoints
                 (input.To == SaleStatus.Delivered ? (result.Plate is null ? "\nSans plaque" : $"\nPlaque : **{result.Plate}**") : "") +
                 (string.IsNullOrWhiteSpace(input.Note) ? "" : $"\nNote : {input.Note.Trim()}"),
                 $"/ventes/{id}");
+            http.RefreshTourBoard();
             return Results.Ok(new { id, status = input.To });
         }).RequirePerm(Permissions.SalesView); // les droits précis sont vérifiés selon la transition
 
@@ -305,6 +300,7 @@ public static class SaleEndpoints
                     $"Tournée : {done.Count} vente(s) → {settings.StatusLabel(input.To)}",
                     DiscordNotifier.BulletList(lines, 3500), "/tournee");
             }
+            if (done.Count > 0) http.RefreshTourBoard();
             return Results.Ok(new { updated = done.Count, failed = errors.Count });
         }).RequirePerm(Permissions.SalesAdvance);
     }

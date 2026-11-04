@@ -116,6 +116,61 @@ public sealed class DiscordRestClient
         return channels.Where(c => c.Type is 0 or 5).OrderBy(c => c.Position).ToList(); // texte + annonces
     }
 
+    public enum EditResult { Ok, NotFound, Failed }
+
+    /// <summary>Publie un message et renvoie son identifiant (null en cas d'échec).</summary>
+    public async Task<string?> CreateMessageAsync(string channelId, object payload, CancellationToken ct)
+    {
+        using var res = await SendWithRetryAsync(HttpMethod.Post, $"/channels/{channelId}/messages", payload, ct);
+        if (!res.IsSuccessStatusCode)
+        {
+            _log.LogWarning("Publication Discord échouée dans {Channel} : {Status} {Body}", channelId, res.StatusCode, await res.Content.ReadAsStringAsync(ct));
+            return null;
+        }
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
+        return doc.RootElement.GetProperty("id").GetString();
+    }
+
+    public async Task<EditResult> EditMessageAsync(string channelId, string messageId, object payload, CancellationToken ct)
+    {
+        using var res = await SendWithRetryAsync(HttpMethod.Patch, $"/channels/{channelId}/messages/{messageId}", payload, ct);
+        if (res.IsSuccessStatusCode) return EditResult.Ok;
+        if (res.StatusCode is HttpStatusCode.NotFound) return EditResult.NotFound; // message supprimé à la main
+        _log.LogWarning("Modification Discord échouée ({Channel}/{Message}) : {Status} {Body}", channelId, messageId, res.StatusCode, await res.Content.ReadAsStringAsync(ct));
+        return EditResult.Failed;
+    }
+
+    public async Task DeleteMessageAsync(string channelId, string messageId, CancellationToken ct)
+    {
+        using var res = await SendWithRetryAsync(HttpMethod.Delete, $"/channels/{channelId}/messages/{messageId}", null, ct);
+        if (!res.IsSuccessStatusCode && res.StatusCode != HttpStatusCode.NotFound)
+            _log.LogWarning("Suppression Discord échouée ({Channel}/{Message}) : {Status}", channelId, messageId, res.StatusCode);
+    }
+
+    /// <summary>Requête bot avec une nouvelle tentative en cas de rate limit (429).</summary>
+    private async Task<HttpResponseMessage> SendWithRetryAsync(HttpMethod method, string path, object? payload, CancellationToken ct)
+    {
+        var body = payload is null ? null : JsonSerializer.Serialize(payload, Json);
+        for (var attempt = 0; ; attempt++)
+        {
+            var req = BotRequest(method, path);
+            if (body is not null) req.Content = new StringContent(body, Encoding.UTF8, "application/json");
+            var res = await _http.SendAsync(req, ct);
+            req.Dispose();
+            if ((int)res.StatusCode != 429 || attempt > 0) return res;
+
+            var wait = 2.0;
+            try
+            {
+                using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync(ct));
+                if (doc.RootElement.TryGetProperty("retry_after", out var ra)) wait = ra.GetDouble();
+            }
+            catch { /* on garde 2 s */ }
+            res.Dispose();
+            await Task.Delay(TimeSpan.FromSeconds(Math.Min(wait + 0.2, 30)), ct);
+        }
+    }
+
     /// <summary>Envoie un message dans un salon. Gère une fois le rate limit (429).</summary>
     public async Task SendMessageAsync(string channelId, object payload, CancellationToken ct)
     {

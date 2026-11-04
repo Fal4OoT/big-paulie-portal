@@ -92,11 +92,44 @@ export function SettingsEditor({ admin, onSaved }: { admin: AdminConfig; onSaved
               <Label>Rôle mentionné pour une vente immédiate</Label>
               {roleSelect(s.immediatePingRoleId, (v) => set({ immediatePingRoleId: v }))}
             </div>
-            <Toggle checked={s.tourEnabled} onChange={(v) => set({ tourEnabled: v })} label="Annonce automatique toutes les 30 minutes (xxh00 et xxh30)" />
-            <Toggle checked={s.tourSkipEmpty} onChange={(v) => set({ tourSkipEmpty: v })} label="Ne rien envoyer quand il n'y a rien à faire" />
+            <Toggle checked={s.tourEnabled} onChange={(v) => set({ tourEnabled: v })} label="Notification automatique toutes les 30 minutes (xxh00 et xxh30)" />
+            <Toggle checked={s.tourSkipEmpty} onChange={(v) => set({ tourSkipEmpty: v })} label="Pas de notification quand il n'y a rien à commander ni à chercher" />
+            <p className="text-xs text-cream-dim">
+              Le salon contient un seul tableau, mis à jour en direct à chaque changement. À chaque tournée (et pour une vente immédiate), il est
+              republié en bas du salon avec la mention des rôles : c'est ce qui envoie la notification.
+            </p>
           </div>
         </Card>
       </div>
+
+      <Card title="Retards">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label>En retard après</Label>
+            <div className="flex items-center gap-3">
+              <Input
+                type="number"
+                min={0}
+                max={48}
+                value={s.tourLateAfter}
+                onChange={(e) => set({ tourLateAfter: Math.max(0, Math.min(48, Number(e.target.value) || 0)) })}
+                className="w-24"
+              />
+              <span className="text-sm text-cream-muted">
+                tournée(s) d'attente{s.tourLateAfter > 0 ? ` (plus de ${s.tourLateAfter * 30} min)` : " — désactivé"}
+              </span>
+            </div>
+          </div>
+          <div>
+            <Label>Grade / rôle mentionné en cas de retard</Label>
+            {roleSelect(s.tourLateRoleId, (v) => set({ tourLateRoleId: v }))}
+          </div>
+        </div>
+        <p className="mt-3 text-xs text-cream-dim">
+          Un véhicule encore « à commander » ou « à chercher » au-delà de ce nombre de tournées est marqué ⏰ dans le tableau, et ce rôle est
+          mentionné à chaque tournée tant qu'il reste des véhicules en retard. 0 désactive les retards.
+        </p>
+      </Card>
 
       <Card title="Statuts des ventes">
         <p className="mb-4 text-sm text-cream-muted">

@@ -46,16 +46,12 @@ public static class MiscEndpoints
         }).RequirePerm(Permissions.TourView);
 
         // Envoi manuel de la liste dans le salon Discord (bouton de la page Tournée).
-        app.MapPost("/api/tour/announce", async (HttpContext http, TourService tour, ConfigService config,
-            BigPaulie.Api.Discord.DiscordNotifier notifier, AuditService audit) =>
+        app.MapPost("/api/tour/announce", async (HttpContext http, ConfigService config, TourBoardService board, AuditService audit) =>
         {
             var settings = await config.GetSettingsAsync();
             if (string.IsNullOrEmpty(settings.TourChannelId)) return EndpointAuth.Bad("Aucun salon de tournée configuré.");
-            var pending = await tour.PendingAsync(SaleStatus.ToOrder, SaleStatus.ToFetch);
-            notifier.Enqueue(settings.TourChannelId, tour.BuildMessage("📣 Point tournée (envoi manuel)",
-                pending.Where(s => s.Status == SaleStatus.ToOrder).ToList(),
-                pending.Where(s => s.Status == SaleStatus.ToFetch).ToList(), settings));
-            await audit.LogAsync(http.Me(), "tour.announce", "tour", null, "Tournée annoncée", "Liste envoyée manuellement sur Discord.");
+            board.RequestRepost(TourBoardService.RepostReason.Manual);
+            await audit.LogAsync(http.Me(), "tour.announce", "tour", null, "Tournée annoncée", "Tableau de tournée republié manuellement sur Discord.");
             return Results.Ok(new { ok = true });
         }).RequirePerm(Permissions.SalesAdvance);
 

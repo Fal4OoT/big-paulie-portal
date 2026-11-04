@@ -29,6 +29,8 @@ public static partial class ConfigEndpoints
         public string? ImmediatePingRoleId { get; set; }
         public bool TourEnabled { get; set; } = true;
         public bool TourSkipEmpty { get; set; } = true;
+        public int TourLateAfter { get; set; } = 3;
+        public string? TourLateRoleId { get; set; }
         public List<StatusSetting>? Statuses { get; set; }
     }
 
@@ -288,7 +290,8 @@ public static partial class ConfigEndpoints
             string? Snow(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim();
             var s = await config.GetSettingsAsync();
             foreach (var (label, value) in new[] { ("Salon de logs", input.LogChannelId), ("Salon de tournée", input.TourChannelId),
-                         ("Rôle à mentionner (tournée)", input.TourPingRoleId), ("Rôle à mentionner (immédiat)", input.ImmediatePingRoleId) })
+                         ("Rôle à mentionner (tournée)", input.TourPingRoleId), ("Rôle à mentionner (immédiat)", input.ImmediatePingRoleId),
+                         ("Rôle à mentionner (retards)", input.TourLateRoleId) })
                 if (Snow(value) is { } v && !SnowflakeRegex().IsMatch(v)) return EndpointAuth.Bad($"{label} : identifiant invalide.");
 
             s.LogChannelId = Snow(input.LogChannelId);
@@ -297,6 +300,9 @@ public static partial class ConfigEndpoints
             s.ImmediatePingRoleId = Snow(input.ImmediatePingRoleId);
             s.TourEnabled = input.TourEnabled;
             s.TourSkipEmpty = input.TourSkipEmpty;
+            if (input.TourLateAfter is < 0 or > 48) return EndpointAuth.Bad("Retard : entre 0 (désactivé) et 48 tournées.");
+            s.TourLateAfter = input.TourLateAfter;
+            s.TourLateRoleId = Snow(input.TourLateRoleId);
 
             if (input.Statuses is not null)
             {
@@ -313,6 +319,7 @@ public static partial class ConfigEndpoints
             }
 
             await config.SaveSettingsAsync(s);
+            http.RefreshTourBoard(); // salon, libellés ou seuil de retard ont pu changer
             await audit.LogAsync(http.Me(), "config.settings", "config", null, "Configuration modifiée", "Réglages Discord et statuts mis à jour.");
             return Results.Ok(new { ok = true });
         });

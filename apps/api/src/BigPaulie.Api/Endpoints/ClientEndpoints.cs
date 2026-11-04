@@ -158,6 +158,7 @@ public static class ClientEndpoints
 
             // Permis ajouté ? On recalcule les avertissements des ventes en cours de ce client.
             await SaleEndpoints.RefreshPermitWarningsAsync(c, id, v.Data);
+            if (changed.Count > 0) http.RefreshTourBoard(); // le nom du client apparaît dans le tableau
             return Results.Ok(new { id });
         }).RequirePerm(Permissions.ClientsEdit);
 

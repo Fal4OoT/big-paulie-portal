@@ -75,6 +75,10 @@ public sealed class PortalSettings
     public string? ImmediatePingRoleId { get; set; }
     public bool TourEnabled { get; set; } = true;
     public bool TourSkipEmpty { get; set; } = true;
+    /// <summary>Nombre de tournées d'attente au-delà duquel un véhicule est « en retard » (0 = désactivé).</summary>
+    public int TourLateAfter { get; set; } = 3;
+    /// <summary>Rôle mentionné à chaque tournée tant qu'il reste des véhicules en retard.</summary>
+    public string? TourLateRoleId { get; set; }
     public List<StatusSetting> Statuses { get; set; } = new();
 
     public string StatusLabel(string code) =>

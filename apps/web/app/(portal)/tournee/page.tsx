@@ -67,7 +67,7 @@ export default function TourPage() {
     setError(null);
     try {
       await api.post("/api/tour/announce");
-      setInfo("Liste envoyée dans le salon Discord de la tournée.");
+      setInfo("Tableau de tournée republié sur Discord (avec notification).");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Envoi impossible.");
     } finally {
@@ -100,7 +100,7 @@ export default function TourPage() {
         actions={
           canAdvance && (
             <Button variant="secondary" onClick={announce} loading={busy === "announce"}>
-              <Megaphone className="h-4 w-4" /> Envoyer la liste sur Discord
+              <Megaphone className="h-4 w-4" /> Notifier sur Discord
             </Button>
           )
         }

@@ -18,6 +18,18 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.3.0",
+    date: "2026-11-04",
+    title: "Tableau de tournée unique et retards",
+    changes: [
+      { kind: "amélioration", text: "Le salon de tournée ne contient plus qu'un seul tableau, mis à jour en direct à chaque vente ou changement de statut : fini le spam." },
+      { kind: "amélioration", text: "À chaque tournée, le tableau est republié en bas du salon avec la mention du rôle, pour que tout le monde reçoive la notification." },
+      { kind: "amélioration", text: "Une vente immédiate republie le tableau avec la mention du rôle « immédiat » au lieu d'envoyer un message séparé." },
+      { kind: "nouveau", text: "Retards : au-delà d'un nombre de tournées réglable, le véhicule est marqué ⏰ et le grade choisi est mentionné à chaque tournée." },
+      { kind: "nouveau", text: "Le tableau affiche aussi les véhicules réceptionnés à livrer." },
+    ],
+  },
+  {
     version: "1.2.0",
     date: "2026-11-04",
     title: "Véhicules en stock et notes de version",

@@ -1,4 +1,3 @@
-using BigPaulie.Api.Auth;
 using BigPaulie.Api.Discord;
 using BigPaulie.Api.Domain;
 using BigPaulie.Api.Endpoints;
@@ -8,9 +7,11 @@ using Npgsql;
 
 namespace BigPaulie.Api.Services;
 
-/// <summary>Tournées : toutes les 30 minutes (heure réelle, xxh00 et xxh30), liste de ce qu'il faut commander et aller chercher.</summary>
+/// <summary>Tournées : toutes les 30 minutes (heure réelle, xxh00 et xxh30), on commande et on va chercher ce qui attend.</summary>
 public sealed class TourService
 {
+    private const int SlotSeconds = 30 * 60;
+
     private readonly NpgsqlDataSource _db;
     private readonly PortalOptions _opt;
     private readonly TimeZoneInfo _tz;
@@ -36,12 +37,27 @@ public sealed class TourService
         var local = TimeZoneInfo.ConvertTimeFromUtc(utcNow, _tz);
         var slot = new DateTime(local.Year, local.Month, local.Day, local.Hour, local.Minute >= 30 ? 30 : 0, 0, DateTimeKind.Unspecified)
             .AddMinutes(30);
-        // Passage heure d'été/hiver : une heure locale inexistante est décalée d'une heure.
+        // Passage heure d'été/hiver : une heure locale inexistante est décalée.
         while (_tz.IsInvalidTime(slot)) slot = slot.AddMinutes(30);
         return TimeZoneInfo.ConvertTimeToUtc(slot, _tz);
     }
 
     public string LocalHour(DateTime utc) => TimeZoneInfo.ConvertTimeFromUtc(utc, _tz).ToString("HH'h'mm");
+
+    /// <summary>
+    /// Nombre de tournées passées depuis la vente. Les tranches xxh00/xxh30 de Paris tombent aussi
+    /// sur xxh00/xxh30 en UTC (décalage d'heures entières), d'où le calcul direct.
+    /// </summary>
+    public static int ToursWaited(DateTime createdUtc, DateTime nowUtc)
+    {
+        static long Slot(DateTime d) => new DateTimeOffset(DateTime.SpecifyKind(d, DateTimeKind.Utc)).ToUnixTimeSeconds() / SlotSeconds;
+        return (int)Math.Max(0, Slot(nowUtc) - Slot(createdUtc));
+    }
+
+    public static bool IsLate(SaleView s, PortalSettings settings, DateTime nowUtc) =>
+        settings.TourLateAfter > 0
+        && (s.Status == SaleStatus.ToOrder || s.Status == SaleStatus.ToFetch)
+        && ToursWaited(s.CreatedAt, nowUtc) > settings.TourLateAfter;
 
     public async Task<List<SaleView>> PendingAsync(params string[] statuses)
     {
@@ -54,45 +70,80 @@ public sealed class TourService
     public static string Line(SaleView s) =>
         $"{(s.Immediate ? "⚡ " : "")}**{SaleEndpoints.Ref(s.Number)}** · {s.VehicleName} ({s.VehicleTypeLabel}) — {s.ClientName}";
 
-    public object BuildMessage(string title, List<SaleView> toOrder, List<SaleView> toFetch, PortalSettings settings)
+    private static string Line(SaleView s, PortalSettings settings, DateTime nowUtc)
     {
-        var role = settings.TourPingRoleId;
-        return DiscordNotifier.Embed(
-            title,
-            toOrder.Count + toFetch.Count == 0
-                ? "Rien à commander ni à aller chercher. 👌"
-                : $"{toOrder.Count} à commander · {toFetch.Count} à aller chercher.",
-            DiscordNotifier.ColorRed,
-            footer: "Big Paulie · Tournée",
-            url: $"{_opt.PublicUrl}/tournee",
-            fields: new[]
-            {
-                ($"📦 {settings.StatusLabel(SaleStatus.ToOrder)} ({toOrder.Count})", DiscordNotifier.BulletList(toOrder.Select(Line).ToList())),
-                ($"🚚 {settings.StatusLabel(SaleStatus.ToFetch)} ({toFetch.Count})", DiscordNotifier.BulletList(toFetch.Select(Line).ToList())),
-            },
-            content: string.IsNullOrEmpty(role) ? null : $"<@&{role}>",
-            pingRoleIds: string.IsNullOrEmpty(role) ? null : new[] { role });
+        if (!IsLate(s, settings, nowUtc)) return Line(s);
+        return $"⏰ {Line(s)} · *{ToursWaited(s.CreatedAt, nowUtc)} tournées*";
     }
+
+    public sealed record BoardData(List<SaleView> ToOrder, List<SaleView> ToFetch, List<SaleView> Received, List<SaleView> Late)
+    {
+        public int ToDo => ToOrder.Count + ToFetch.Count;
+    }
+
+    public async Task<BoardData> LoadBoardAsync(PortalSettings settings, DateTime nowUtc)
+    {
+        var pending = await PendingAsync(SaleStatus.ToOrder, SaleStatus.ToFetch, SaleStatus.Received);
+        return new BoardData(
+            pending.Where(s => s.Status == SaleStatus.ToOrder).ToList(),
+            pending.Where(s => s.Status == SaleStatus.ToFetch).ToList(),
+            pending.Where(s => s.Status == SaleStatus.Received).ToList(),
+            pending.Where(s => IsLate(s, settings, nowUtc)).ToList());
+    }
+
+    /// <summary>Embed du tableau de tournée (le message unique du salon).</summary>
+    public object BuildBoardEmbed(BoardData d, PortalSettings settings, DateTime nowUtc)
+    {
+        var next = NextSlotUtc(nowUtc);
+        var summary = d.ToDo + d.Received.Count == 0
+            ? "Rien à commander, à chercher ni à livrer. 👌"
+            : $"{d.ToOrder.Count} à commander · {d.ToFetch.Count} à chercher · {d.Received.Count} à livrer";
+        if (d.Late.Count > 0)
+            summary += $"\n⏰ **{d.Late.Count} véhicule(s) en retard** (plus de {settings.TourLateAfter} tournées d'attente)";
+
+        return new
+        {
+            Title = "🚚 Tableau de tournée",
+            Url = $"{_opt.PublicUrl}/tournee",
+            Description = $"Prochaine tournée : **{LocalHour(next)}**\n{summary}",
+            Color = d.Late.Count > 0 ? DiscordNotifier.ColorOrange : DiscordNotifier.ColorRed,
+            Timestamp = nowUtc.ToString("o"),
+            Footer = new { Text = "Big Paulie · mis à jour automatiquement" },
+            Fields = new[]
+            {
+                Field($"📦 {settings.StatusLabel(SaleStatus.ToOrder)} ({d.ToOrder.Count})", d.ToOrder, settings, nowUtc),
+                Field($"🚚 {settings.StatusLabel(SaleStatus.ToFetch)} ({d.ToFetch.Count})", d.ToFetch, settings, nowUtc),
+                Field($"🏁 {settings.StatusLabel(SaleStatus.Received)} ({d.Received.Count})", d.Received, settings, nowUtc),
+            },
+        };
+    }
+
+    private static object Field(string name, List<SaleView> sales, PortalSettings settings, DateTime nowUtc) => new
+    {
+        Name = name,
+        Value = DiscordNotifier.BulletList(sales.Select(s => Line(s, settings, nowUtc)).ToList()),
+        Inline = false,
+    };
 }
 
 public sealed class TourSchedulerService : BackgroundService
 {
     private readonly TourService _tour;
-    private readonly ConfigService _config;
-    private readonly DiscordNotifier _notifier;
+    private readonly TourBoardService _board;
     private readonly ILogger<TourSchedulerService> _log;
 
-    public TourSchedulerService(TourService tour, ConfigService config, DiscordNotifier notifier, ILogger<TourSchedulerService> log)
+    public TourSchedulerService(TourService tour, TourBoardService board, ILogger<TourSchedulerService> log)
     {
         _tour = tour;
-        _config = config;
-        _notifier = notifier;
+        _board = board;
         _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _log.LogInformation("Planificateur de tournées démarré (fuseau {Tz}).", _tour.TimeZone.Id);
+        _board.RequestRefresh(); // remet le tableau à jour après un redémarrage
+
         while (!stoppingToken.IsCancellationRequested)
         {
             var next = _tour.NextSlotUtc(DateTime.UtcNow);
@@ -103,25 +154,9 @@ public sealed class TourSchedulerService : BackgroundService
                 catch (OperationCanceledException) { break; }
             }
 
-            try
-            {
-                var settings = await _config.GetSettingsAsync();
-                if (!settings.TourEnabled || string.IsNullOrEmpty(settings.TourChannelId)) continue;
+            _board.RequestRepost(TourBoardService.RepostReason.Slot, _tour.LocalHour(next));
 
-                var pending = await _tour.PendingAsync(SaleStatus.ToOrder, SaleStatus.ToFetch);
-                var toOrder = pending.Where(s => s.Status == SaleStatus.ToOrder).ToList();
-                var toFetch = pending.Where(s => s.Status == SaleStatus.ToFetch).ToList();
-                if (pending.Count == 0 && settings.TourSkipEmpty) continue;
-
-                _notifier.Enqueue(settings.TourChannelId,
-                    _tour.BuildMessage($"🕒 Tournée de {_tour.LocalHour(next)}", toOrder, toFetch, settings));
-            }
-            catch (Exception ex)
-            {
-                _log.LogError(ex, "Erreur pendant la tournée de {Slot}", next);
-            }
-
-            // Évite un double envoi si l'horloge saute légèrement.
+            // Évite un double déclenchement si l'horloge saute légèrement.
             try { await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken); }
             catch (OperationCanceledException) { break; }
         }
