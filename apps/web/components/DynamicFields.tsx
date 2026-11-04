@@ -1,6 +1,6 @@
 "use client";
 
-import { ageFrom, cn, formatDate } from "@/lib/format";
+import { ageFrom, cn, formatDate, formatPhone } from "@/lib/format";
 import type { DataRecord, FieldDefinition, FieldValue } from "@/lib/types";
 import { ImagePaste } from "./ImagePaste";
 import { Input, Label, Select, Textarea } from "./ui";
@@ -105,22 +105,35 @@ function FieldInput({
       input = <Input id={id} type="number" step="any" value={str} onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)} disabled={disabled} />;
       break;
     case "phone":
-      input = <Input id={id} type="tel" value={str} onChange={(e) => onChange(e.target.value)} disabled={disabled} maxLength={30} />;
+      input = (
+        <Input
+          id={id}
+          type="tel"
+          inputMode="numeric"
+          value={str}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 10))}
+          disabled={disabled}
+          maxLength={10}
+          placeholder="5209250963"
+        />
+      );
       break;
     default:
       input = <Input id={id} value={str} onChange={(e) => onChange(e.target.value)} disabled={disabled} maxLength={200} />;
   }
 
   const age = f.type === "date" && f.key === "date_naissance" ? ageFrom(str) : null;
+  const phonePreview = f.type === "phone" && str.length === 10 ? formatPhone(str) : null;
   return (
     <div>
       <Label htmlFor={id} required={f.required}>
         {f.label}
       </Label>
       {input}
-      {(f.help || age !== null) && (
+      {(f.help || age !== null || phonePreview) && (
         <p className="mt-1 text-xs text-cream-dim">
           {age !== null && <span className="text-cream-muted">{age} ans. </span>}
+          {phonePreview && <span className="text-cream-muted">Affiché : {phonePreview}. </span>}
           {f.help}
         </p>
       )}
@@ -132,6 +145,7 @@ function FieldInput({
 export function FieldDisplay({ field, value }: { field: FieldDefinition; value: FieldValue }) {
   if (value === null || value === undefined || value === "") return <span className="text-cream-dim">—</span>;
   if (field.type === "checkbox") return <span>{value === true ? "Oui" : "Non"}</span>;
+  if (field.type === "phone") return <span className="tabular-nums">{formatPhone(String(value))}</span>;
   if (field.type === "date") {
     const age = field.key === "date_naissance" ? ageFrom(String(value)) : null;
     return (

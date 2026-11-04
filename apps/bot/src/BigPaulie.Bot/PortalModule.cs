@@ -30,7 +30,7 @@ public sealed class PortalModule : InteractionModuleBase<SocketInteractionContex
         foreach (var c in res.Data)
         {
             var lines = new List<string>();
-            if (!string.IsNullOrEmpty(c.Telephone)) lines.Add($"📞 {c.Telephone}");
+            if (!string.IsNullOrEmpty(c.Telephone)) lines.Add($"📞 {Phone(c.Telephone)}");
             if (!string.IsNullOrEmpty(c.DateNaissance) && DateOnly.TryParse(c.DateNaissance, out var d)) lines.Add($"🎂 {d:dd/MM/yyyy}");
             if (c.ActiveSaleCount > 0) lines.Add($"🚗 {c.ActiveSaleCount} vente(s) en cours");
             lines.Add($"[Ouvrir la fiche]({_opt.PublicUrl}/clients/{c.Id})");
@@ -96,6 +96,10 @@ public sealed class PortalModule : InteractionModuleBase<SocketInteractionContex
         }
         return sb.ToString().TrimEnd();
     }
+
+    /// <summary>5209250963 -> (520)925-0963</summary>
+    private static string Phone(string p) =>
+        p.Length == 10 && p.All(char.IsDigit) ? $"({p[..3]}){p[3..6]}-{p[6..]}" : p;
 
     private static string Short(string s, int max) => s.Length <= max ? s : s[..(max - 1)] + "…";
 }

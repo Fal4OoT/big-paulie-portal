@@ -23,6 +23,8 @@ export interface VehicleCategory {
   label: string;
   sortOrder: number;
   active: boolean;
+  /** Plaque demandée à la livraison (terrestre). */
+  requiresPlate: boolean;
 }
 
 export interface VehicleType {
@@ -102,6 +104,7 @@ export interface Sale {
   vehicleTypeId: string;
   vehicleTypeLabel: string;
   categoryLabel: string;
+  requiresPlate: boolean;
   price: number;
   immediate: boolean;
   plate: string | null;

@@ -62,20 +62,28 @@ export function VehiclesEditor() {
       <Card
         title="Catégories"
         actions={
-          <Button size="sm" variant="secondary" onClick={() => setCats((c) => [...c, { id: newId(), label: "Nouvelle catégorie", sortOrder: 0, active: true }])}>
+          <Button size="sm" variant="secondary" onClick={() => setCats((c) => [...c, { id: newId(), label: "Nouvelle catégorie", sortOrder: 0, active: true, requiresPlate: true }])}>
             <Plus className="h-4 w-4" /> Ajouter
           </Button>
         }
       >
-        <p className="mb-4 text-sm text-cream-muted">Une catégorie n'est jamais supprimée (des ventes y sont liées) : désactive-la pour la masquer.</p>
+        <p className="mb-4 text-sm text-cream-muted">
+          Une catégorie n'est jamais supprimée (des ventes y sont liées) : désactive-la pour la masquer. « Plaque à la livraison » décide si la plaque est demandée au passage en Livré.
+        </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {cats.map((c, i) => (
-            <div key={c.id} className={cn("flex items-center gap-3 rounded-lg border border-night-500/70 bg-night-900/50 p-3", !c.active && "opacity-60")}>
+            <div key={c.id} className={cn("space-y-3 rounded-lg border border-night-500/70 bg-night-900/50 p-3", !c.active && "opacity-60")}>
               <Input value={c.label} onChange={(e) => updCat(i, { label: e.target.value })} maxLength={40} />
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={c.active} onChange={(e) => updCat(i, { active: e.target.checked })} className="h-4 w-4 accent-[#2F7D53]" />
-                Active
-              </label>
+              <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={c.active} onChange={(e) => updCat(i, { active: e.target.checked })} className="h-4 w-4 accent-[#2F7D53]" />
+                  Active
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={c.requiresPlate} onChange={(e) => updCat(i, { requiresPlate: e.target.checked })} className="h-4 w-4 accent-[#2F7D53]" />
+                  Plaque à la livraison
+                </label>
+              </div>
             </div>
           ))}
         </div>

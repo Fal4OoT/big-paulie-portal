@@ -80,8 +80,10 @@ public static class FieldValidator
                     break;
 
                 case "phone":
-                    if (str!.Length > 30) errors.Add($"« {f.Label} » : trop long.");
-                    else output[f.Key] = str;
+                    // Stocké en 10 chiffres (5209250963), affiché (520)925-0963.
+                    var digits = new string(str!.Where(char.IsDigit).ToArray());
+                    if (digits.Length != 10) errors.Add($"« {f.Label} » : 10 chiffres attendus (ex : 5209250963).");
+                    else output[f.Key] = digits;
                     break;
 
                 default: // text, textarea

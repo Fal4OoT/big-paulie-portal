@@ -41,6 +41,13 @@ export function formatMoney(v: number): string {
   return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(v) + " $";
 }
 
+/** 5209250963 -> (520)925-0963 (toute autre valeur est affichée telle quelle). */
+export function formatPhone(p: string | null | undefined): string {
+  if (!p) return "—";
+  const d = String(p).replace(/\D/g, "");
+  return d.length === 10 ? `(${d.slice(0, 3)})${d.slice(3, 6)}-${d.slice(6)}` : String(p);
+}
+
 export function cn(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
 }

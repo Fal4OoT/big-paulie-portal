@@ -50,6 +50,7 @@ export function SaleFormModal({
   const type = config.vehicleTypes.find((t) => t.id === typeId);
   const permitField = type?.permitFieldKey ? config.clientFields.find((f) => f.key === type.permitFieldKey) : undefined;
   const permitMissing = !!type?.permitFieldKey && !clientData[type.permitFieldKey];
+  const requiresPlate = config.categories.find((c) => c.id === type?.categoryId)?.requiresPlate ?? true;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -60,7 +61,7 @@ export function SaleFormModal({
 
     setSaving(true);
     try {
-      const body = { clientId, vehicleName, vehicleTypeId: typeId, price: p, immediate, plate: plate || null, data };
+      const body = { clientId, vehicleName, vehicleTypeId: typeId, price: p, immediate, plate: requiresPlate ? plate || null : null, data };
       if (sale) {
         await api.put(`/api/sales/${sale.id}`, body);
         onSaved(sale.id);
@@ -108,7 +109,7 @@ export function SaleFormModal({
             </Label>
             <Input id="price" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} required placeholder="0" />
           </div>
-          {sale?.status === "DELIVERED" && (
+          {sale?.status === "DELIVERED" && requiresPlate && (
             <div>
               <Label htmlFor="plate" required>
                 Plaque

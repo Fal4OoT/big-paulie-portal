@@ -9,7 +9,7 @@ import { SaleFormModal } from "@/components/SaleForm";
 import { ImmediateBadge, StatusBadge } from "@/components/StatusBadge";
 import { Button, Card, ErrorBox, Input, Label, Modal, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
-import { cn, formatDateTime, formatMoney } from "@/lib/format";
+import { cn, formatDateTime, formatMoney, formatPhone } from "@/lib/format";
 import { PERM, useCan, usePortal, useStatus } from "@/lib/portal-context";
 import { STATUS_FLOW, type Client, type Sale, type SaleEvent, type StatusCode } from "@/lib/types";
 
@@ -70,7 +70,7 @@ export default function SalePage() {
 
   function advance() {
     if (!next) return;
-    if (next === "DELIVERED") setDeliverOpen(true);
+    if (next === "DELIVERED" && sale!.requiresPlate) setDeliverOpen(true);
     else void changeStatus(next);
   }
 
@@ -181,14 +181,22 @@ export default function SalePage() {
               <Link href={`/clients/${sale.clientId}`} className="text-sand hover:underline">
                 {sale.clientName}
               </Link>
-              {sale.clientPhone && <div className="text-sm text-cream-muted">{sale.clientPhone}</div>}
+              {sale.clientPhone && <div className="text-sm text-cream-muted">{formatPhone(sale.clientPhone)}</div>}
             </Info>
             <Info label="Prix de vente">{formatMoney(sale.price)}</Info>
             <Info label="Type">
               {sale.vehicleTypeLabel} · {sale.categoryLabel}
             </Info>
             <Info label="Livraison">{sale.immediate ? "Immédiate (on part le chercher)" : "Prochaine tournée"}</Info>
-            <Info label="Plaque">{sale.plate ? <span className="font-mono">{sale.plate}</span> : <span className="text-cream-dim">À renseigner à la livraison</span>}</Info>
+            <Info label="Plaque">
+              {!sale.requiresPlate ? (
+                <span className="text-cream-dim">Sans plaque ({sale.categoryLabel.toLowerCase()})</span>
+              ) : sale.plate ? (
+                <span className="font-mono">{sale.plate}</span>
+              ) : (
+                <span className="text-cream-dim">À renseigner à la livraison</span>
+              )}
+            </Info>
             <Info label="Vendeur">{sale.sellerName}</Info>
             <Info label="Date de vente">{formatDateTime(sale.createdAt)}</Info>
             <Info label="Livrée le">{formatDateTime(sale.deliveredAt)}</Info>

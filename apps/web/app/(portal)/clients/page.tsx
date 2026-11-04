@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button, Card, Empty, ErrorBox, Input, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
-import { ageFrom, formatDate, formatRelative } from "@/lib/format";
+import { ageFrom, formatDate, formatPhone, formatRelative } from "@/lib/format";
 import { PERM, useCan } from "@/lib/portal-context";
 import type { Client } from "@/lib/types";
 
@@ -73,7 +73,7 @@ export default function ClientsPage() {
                           {c.name}
                         </Link>
                       </td>
-                      <td>{(c.data.telephone as string) || <span className="text-cream-dim">—</span>}</td>
+                      <td className="tabular-nums">{c.data.telephone ? formatPhone(String(c.data.telephone)) : <span className="text-cream-dim">—</span>}</td>
                       <td>
                         {formatDate(dob)}
                         {age !== null && <span className="text-cream-dim"> · {age} ans</span>}

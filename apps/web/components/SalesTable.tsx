@@ -2,7 +2,7 @@
 
 import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { formatMoney, formatRelative } from "@/lib/format";
+import { formatMoney, formatPhone, formatRelative } from "@/lib/format";
 import type { Sale } from "@/lib/types";
 import { ImmediateBadge, StatusBadge } from "./StatusBadge";
 import { Empty } from "./ui";
@@ -49,7 +49,7 @@ export function SalesTable({ sales, hideClient, empty = "Aucune vente." }: { sal
                   <Link href={`/clients/${s.clientId}`} className="hover:underline">
                     {s.clientName}
                   </Link>
-                  {s.clientPhone && <div className="text-xs text-cream-dim">{s.clientPhone}</div>}
+                  {s.clientPhone && <div className="text-xs text-cream-dim">{formatPhone(s.clientPhone)}</div>}
                 </td>
               )}
               <td>
@@ -59,7 +59,9 @@ export function SalesTable({ sales, hideClient, empty = "Aucune vente." }: { sal
                 </div>
               </td>
               <td className="text-right tabular-nums">{formatMoney(s.price)}</td>
-              <td className="font-mono text-xs">{s.plate ?? <span className="text-cream-dim">—</span>}</td>
+              <td className="font-mono text-xs">
+                {s.plate ?? <span className="font-sans text-cream-dim">{s.requiresPlate ? "—" : "Sans plaque"}</span>}
+              </td>
               <td className="pr-5 text-xs text-cream-muted">
                 {formatRelative(s.createdAt)}
                 <div className="text-cream-dim">{s.sellerName}</div>

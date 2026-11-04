@@ -4,7 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatPhone } from "@/lib/format";
 import { usePortal } from "@/lib/portal-context";
 import type { DataRecord, Duplicate } from "@/lib/types";
 import { DynamicFields } from "./DynamicFields";
@@ -96,7 +96,7 @@ export function ClientForm({
                 <span className="text-cream-muted">
                   {" "}
                   · né(e) le {formatDate(d.dateNaissance)}
-                  {d.telephone ? ` · ${d.telephone}` : ""}
+                  {d.telephone ? ` · ${formatPhone(d.telephone)}` : ""}
                   {d.strong ? " · même date de naissance" : ""}
                 </span>
               </li>

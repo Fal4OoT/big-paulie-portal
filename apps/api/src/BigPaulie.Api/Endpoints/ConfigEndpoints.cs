@@ -212,9 +212,10 @@ public static partial class ConfigEndpoints
             foreach (var cat in input.Categories)
             {
                 await c.ExecuteAsync("""
-                    INSERT INTO vehicle_categories (id, label, sort_order, active) VALUES (@Id, @Label, @order, @Active)
-                    ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, sort_order = EXCLUDED.sort_order, active = EXCLUDED.active
-                    """, new { cat.Id, cat.Label, order, cat.Active }, tx);
+                    INSERT INTO vehicle_categories (id, label, sort_order, active, requires_plate) VALUES (@Id, @Label, @order, @Active, @RequiresPlate)
+                    ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, sort_order = EXCLUDED.sort_order, active = EXCLUDED.active,
+                        requires_plate = EXCLUDED.requires_plate
+                    """, new { cat.Id, cat.Label, order, cat.Active, cat.RequiresPlate }, tx);
                 order += 10;
             }
             order = 10;

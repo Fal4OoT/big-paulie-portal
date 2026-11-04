@@ -19,11 +19,11 @@ Dépôt **autonome** : il ne dépend d'aucun autre projet (notamment pas du port
 - **Connexion Discord** : l'accès dépend des **grades**, chacun lié à un rôle Discord (resynchronisé toutes les 5 min).
   Grades par défaut : Patron, Chef de service, Confirmé, Employé, plus un accès **Staff** (lecture seule + logs).
 - **Matrice de permissions** modifiable par le Patron (clients, ventes, statuts, retour arrière, annulation, tournée, logs, configuration).
-- **Fiche client configurable** : prénom, nom, téléphone, date de naissance (âge calculé) et un emplacement **image à coller (Ctrl+V)** par permis : voiture, moto, bateau, hélicoptère, avion. Champs ajoutables, renommables, réordonnables.
+- **Fiche client configurable** : prénom, nom, téléphone (saisi `5209250963`, affiché `(520)925-0963`), date de naissance (âge calculé) et un emplacement **image à coller (Ctrl+V)** par permis : voiture, moto, bateau, hélicoptère, avion. Champs ajoutables, renommables, réordonnables.
 - **Détection des doublons** (même prénom + nom, renforcée si même date de naissance) avec confirmation explicite.
 - **Ventes** : nom du véhicule, type → catégorie (Terrestre / Maritime / Aérien), prix, date et vendeur automatiques, option **immédiat**, champs complémentaires configurables.
   Avertissement (sans blocage) si le client n'a pas le permis correspondant au type.
-- **Circuit** : À commander → À chercher → Réceptionné · à livrer → Livré (**plaque obligatoire**, en majuscules, unique). Annulation / rétablissement.
+- **Circuit** : À commander → À chercher → Réceptionné · à livrer → Livré. **Plaque obligatoire** (majuscules, unique) pour les catégories qui en ont (Terrestre par défaut) ; maritime et aérien sans plaque. Annulation / rétablissement.
   Libellés et couleurs des statuts configurables.
 - **Historique** de chaque vente : qui a fait quoi, à chaque étape, et quand.
 - **Tournées** toutes les 30 min (heure de Paris, xxh00 / xxh30) : le bot publie la liste à commander / à chercher, avec mention de rôle. Une vente immédiate déclenche une alerte tout de suite.

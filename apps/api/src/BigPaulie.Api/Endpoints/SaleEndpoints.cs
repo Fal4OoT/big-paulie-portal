@@ -40,7 +40,7 @@ public static class SaleEndpoints
         SELECT s.id, s.number, s.client_id,
                trim(coalesce(c.data->>'prenom','') || ' ' || coalesce(c.data->>'nom','')) AS client_name,
                c.data->>'telephone' AS client_phone,
-               s.vehicle_name, s.vehicle_type_id, vt.label AS vehicle_type_label, vc.label AS category_label,
+               s.vehicle_name, s.vehicle_type_id, vt.label AS vehicle_type_label, vc.label AS category_label, vc.requires_plate,
                s.price, s.immediate, s.plate, s.status, s.permit_warning, s.data::text AS data_json,
                s.seller_id, u.display_name AS seller_name, s.created_at, s.updated_at, s.delivered_at
         FROM sales s
@@ -62,6 +62,7 @@ public static class SaleEndpoints
         s.VehicleTypeId,
         s.VehicleTypeLabel,
         s.CategoryLabel,
+        s.RequiresPlate,
         s.Price,
         s.Immediate,
         s.Plate,
@@ -200,8 +201,12 @@ public static class SaleEndpoints
             var type = types.FirstOrDefault(t => t.Id == input.VehicleTypeId && (t.Active || t.Id == sale.VehicleTypeId));
             if (type is null) return EndpointAuth.Bad("Type de véhicule invalide.");
 
+            var categories = await config.GetCategoriesAsync();
+            var requiresPlate = categories.FirstOrDefault(x => x.Id == type.CategoryId)?.RequiresPlate ?? true;
+
             string? plate = sale.Plate;
-            if (sale.Status == SaleStatus.Delivered)
+            if (!requiresPlate) plate = null;
+            else if (sale.Status == SaleStatus.Delivered)
             {
                 plate = NormalizePlate(input.Plate);
                 if (plate is null) return EndpointAuth.Bad("Plaque obligatoire pour une vente livrée (16 caractères max).");
@@ -258,7 +263,7 @@ public static class SaleEndpoints
             await audit.LogAsync(me, input.To == SaleStatus.Cancelled ? "sale.cancelled" : "sale.status", "sale", id.ToString(),
                 $"Vente {Ref(s.Number)} : {settings.StatusLabel(result.From!)} → {settings.StatusLabel(input.To!)}",
                 $"**{s.VehicleName}** ({s.VehicleTypeLabel}) pour **{s.ClientName}**" +
-                (input.To == SaleStatus.Delivered ? $"\nPlaque : **{result.Plate}**" : "") +
+                (input.To == SaleStatus.Delivered ? (result.Plate is null ? "\nSans plaque" : $"\nPlaque : **{result.Plate}**") : "") +
                 (string.IsNullOrWhiteSpace(input.Note) ? "" : $"\nNote : {input.Note.Trim()}"),
                 $"/ventes/{id}");
             return Results.Ok(new { id, status = input.To });
@@ -320,7 +325,8 @@ public static class SaleEndpoints
             return new(EndpointAuth.Bad("Une vente annulée se rétablit en « À commander »."));
 
         string? plate = sale.Plate;
-        if (to == SaleStatus.Delivered)
+        if (!sale.RequiresPlate) plate = null; // maritime / aérien : pas de plaque
+        else if (to == SaleStatus.Delivered)
         {
             plate = NormalizePlate(plateInput) ?? sale.Plate;
             if (plate is null) return new(EndpointAuth.Bad("La plaque est obligatoire pour passer la vente en livrée."));

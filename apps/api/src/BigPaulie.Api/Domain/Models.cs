@@ -46,6 +46,8 @@ public sealed class VehicleCategory
     public string Label { get; set; } = "";
     public int SortOrder { get; set; }
     public bool Active { get; set; } = true;
+    /// <summary>Plaque obligatoire à la livraison (terrestre). Sans plaque pour le maritime et l'aérien.</summary>
+    public bool RequiresPlate { get; set; } = true;
 }
 
 public sealed class VehicleType
@@ -110,6 +112,7 @@ public sealed class SaleView
     public Guid VehicleTypeId { get; set; }
     public string VehicleTypeLabel { get; set; } = "";
     public string CategoryLabel { get; set; } = "";
+    public bool RequiresPlate { get; set; }
     public decimal Price { get; set; }
     public bool Immediate { get; set; }
     public string? Plate { get; set; }
