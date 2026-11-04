@@ -58,6 +58,8 @@ public sealed class VehicleType
     public string? PermitFieldKey { get; set; }
     public int SortOrder { get; set; }
     public bool Active { get; set; } = true;
+    /// <summary>Plaque à la livraison pour ce type (null = comme la catégorie).</summary>
+    public bool? RequiresPlate { get; set; }
 }
 
 public sealed class StatusSetting
@@ -112,6 +114,7 @@ public sealed class SaleView
     public Guid ClientId { get; set; }
     public string ClientName { get; set; } = "";
     public string? ClientPhone { get; set; }
+    public Guid? CatalogVehicleId { get; set; }
     public string VehicleName { get; set; } = "";
     public Guid VehicleTypeId { get; set; }
     public string VehicleTypeLabel { get; set; } = "";

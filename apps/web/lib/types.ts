@@ -34,6 +34,75 @@ export interface VehicleType {
   permitFieldKey: string | null;
   sortOrder: number;
   active: boolean;
+  /** Plaque à la livraison pour ce type (null = comme la catégorie). */
+  requiresPlate: boolean | null;
+}
+
+export interface CatalogVehicle {
+  id: string;
+  name: string;
+  segmentEmoji: string | null;
+  segmentLabel: string | null;
+  vehicleTypeId: string | null;
+}
+
+export interface CatalogSegment {
+  emoji: string;
+  label: string;
+  vehicleTypeId: string | null;
+  sortOrder: number;
+  vehicleCount: number;
+}
+
+export interface CatalogAdmin {
+  segments: CatalogSegment[];
+  activeCount: number;
+  inactiveCount: number;
+  lastImportAt: string | null;
+  withoutSegment: number;
+  offCatalogSales: number;
+}
+
+export interface CatalogImportResult {
+  company: string | null;
+  total: number;
+  added: string[];
+  renamed: { from: string; to: string }[];
+  movedSegment: number;
+  reactivated: string[];
+  removed: string[];
+  unknownSegments: string[];
+  applied: boolean;
+  linkedSales: number;
+}
+
+export interface StatsGroup {
+  label: string;
+  detail: string | null;
+  count: number;
+  revenue: number;
+}
+
+export interface StatsData {
+  from: string;
+  to: string;
+  totals: {
+    count: number;
+    revenue: number;
+    averagePrice: number | null;
+    delivered: number;
+    pending: number;
+    immediate: number;
+    fromStock: number;
+    offCatalog: number;
+    cancelled: number;
+    avgDeliveryHours: number | null;
+  };
+  vehicles: StatsGroup[];
+  segments: StatsGroup[];
+  types: StatsGroup[];
+  sellers: StatsGroup[];
+  days: { date: string; count: number; revenue: number }[];
 }
 
 export type StatusCode = "TO_ORDER" | "TO_FETCH" | "RECEIVED" | "DELIVERED" | "CANCELLED";
@@ -100,6 +169,7 @@ export interface Sale {
   clientId: string;
   clientName: string;
   clientPhone: string | null;
+  catalogVehicleId: string | null;
   vehicleName: string;
   vehicleTypeId: string;
   vehicleTypeLabel: string;

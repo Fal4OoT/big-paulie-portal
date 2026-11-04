@@ -14,6 +14,7 @@ public static class Permissions
     public const string SalesEdit = "sales.edit";
     public const string SalesCancel = "sales.cancel";
     public const string TourView = "tour.view";
+    public const string StatsView = "stats.view";
     public const string LogsView = "logs.view";
     public const string ConfigManage = "config.manage";
 
@@ -32,6 +33,7 @@ public static class Permissions
         new(SalesEdit, "Modifier une vente", "Ventes"),
         new(SalesCancel, "Annuler / rétablir une vente", "Ventes"),
         new(TourView, "Voir la tournée", "Logistique"),
+        new(StatsView, "Voir l'analyse des ventes", "Logistique"),
         new(LogsView, "Voir les logs", "Administration"),
         new(ConfigManage, "Configuration du portail", "Administration"),
     };

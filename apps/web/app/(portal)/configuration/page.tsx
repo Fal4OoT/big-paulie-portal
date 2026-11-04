@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CatalogEditor } from "@/components/config/CatalogEditor";
 import { FieldsEditor } from "@/components/config/FieldsEditor";
 import { GradesEditor } from "@/components/config/GradesEditor";
 import { MembersList } from "@/components/config/MembersList";
@@ -17,6 +18,7 @@ const TABS = [
   { key: "client", label: "Fiche client" },
   { key: "sale", label: "Fiche vente" },
   { key: "vehicles", label: "Véhicules" },
+  { key: "catalog", label: "Catalogue" },
   { key: "discord", label: "Discord, tournée & statuts" },
   { key: "members", label: "Membres" },
 ] as const;
@@ -72,6 +74,7 @@ export default function ConfigurationPage() {
       {tab === "client" && <FieldsEditor entity="client" />}
       {tab === "sale" && <FieldsEditor entity="sale" />}
       {tab === "vehicles" && <VehiclesEditor />}
+      {tab === "catalog" && <CatalogEditor />}
       {tab === "members" && <MembersList />}
       {(tab === "grades" || tab === "discord") &&
         (!admin ? (

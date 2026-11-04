@@ -97,7 +97,10 @@ export function VehiclesEditor() {
             variant="secondary"
             disabled={cats.length === 0}
             onClick={() =>
-              setTypes((t) => [...t, { id: newId(), label: "Nouveau type", categoryId: cats.find((c) => c.active)?.id ?? cats[0].id, permitFieldKey: null, sortOrder: 0, active: true }])
+              setTypes((t) => [
+                ...t,
+                { id: newId(), label: "Nouveau type", categoryId: cats.find((c) => c.active)?.id ?? cats[0].id, permitFieldKey: null, sortOrder: 0, active: true, requiresPlate: null },
+              ])
             }
           >
             <Plus className="h-4 w-4" /> Ajouter
@@ -109,7 +112,7 @@ export function VehiclesEditor() {
         </p>
         <div className="space-y-3">
           {types.map((t, i) => (
-            <div key={t.id} className={cn("grid items-end gap-3 rounded-lg border border-night-500/70 bg-night-900/50 p-3 md:grid-cols-[1fr_1fr_1fr_auto]", !t.active && "opacity-60")}>
+            <div key={t.id} className={cn("grid items-end gap-3 rounded-lg border border-night-500/70 bg-night-900/50 p-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]", !t.active && "opacity-60")}>
               <div>
                 <Label>Type</Label>
                 <Input value={t.label} onChange={(e) => updType(i, { label: e.target.value })} maxLength={40} />
@@ -134,6 +137,17 @@ export function VehiclesEditor() {
                       {f.label}
                     </option>
                   ))}
+                </Select>
+              </div>
+              <div>
+                <Label>Plaque</Label>
+                <Select
+                  value={t.requiresPlate === null ? "" : t.requiresPlate ? "oui" : "non"}
+                  onChange={(e) => updType(i, { requiresPlate: e.target.value === "" ? null : e.target.value === "oui" })}
+                >
+                  <option value="">Comme la catégorie</option>
+                  <option value="oui">Oui</option>
+                  <option value="non">Non</option>
                 </Select>
               </div>
               <label className="flex h-10 items-center gap-2 text-sm">

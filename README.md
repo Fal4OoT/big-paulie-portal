@@ -26,6 +26,8 @@ Dépôt **autonome** : il ne dépend d'aucun autre projet (notamment pas du port
 - **Détection des doublons** (même prénom + nom, renforcée si même date de naissance) avec confirmation explicite.
 - **Ventes** : nom du véhicule, type → catégorie (Terrestre / Maritime / Aérien), prix, date et vendeur automatiques, option **immédiat**, champs complémentaires configurables.
   Avertissement (sans blocage) si le client n'a pas le permis correspondant au type.
+- **Catalogue** importé depuis le panel légal (copier-coller de la réponse du panel) : recherche du véhicule à la vente, noms uniformes, gammes.
+- **Analyse** : véhicules les plus vendus, gammes, types, vendeurs, ventes par jour, délai de livraison.
 - **Véhicule en stock** : la vente démarre directement en « Réceptionné · à livrer ».
 - **Circuit** : À commander → À chercher → Réceptionné · à livrer → Livré. **Plaque obligatoire** (majuscules, unique) pour les catégories qui en ont (Terrestre par défaut) ; maritime et aérien sans plaque. Annulation / rétablissement.
   Libellés et couleurs des statuts configurables.

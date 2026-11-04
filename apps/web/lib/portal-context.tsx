@@ -41,6 +41,7 @@ export const PERM = {
   salesEdit: "sales.edit",
   salesCancel: "sales.cancel",
   tourView: "tour.view",
+  statsView: "stats.view",
   logsView: "logs.view",
   configManage: "config.manage",
 } as const;

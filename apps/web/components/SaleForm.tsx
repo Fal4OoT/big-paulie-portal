@@ -1,11 +1,12 @@
 "use client";
 
 import { AlertTriangle } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
 import { usePortal, useStatus } from "@/lib/portal-context";
-import type { DataRecord, Sale } from "@/lib/types";
+import type { CatalogVehicle, DataRecord, Sale } from "@/lib/types";
 import { DynamicFields } from "./DynamicFields";
+import { loadCatalog, VehicleSearch } from "./VehicleSearch";
 import { Button, ErrorBox, Input, Label, Modal, Select, Toggle } from "./ui";
 
 /** Création (clientId + clientData) ou modification (sale) d'une vente. */
@@ -27,6 +28,10 @@ export function SaleFormModal({
   const { config } = usePortal();
   const status = useStatus();
   const [vehicleName, setVehicleName] = useState(sale?.vehicleName ?? "");
+  const [catalog, setCatalog] = useState<CatalogVehicle[] | null>(null);
+  const [catalogVehicle, setCatalogVehicle] = useState<CatalogVehicle | null>(null);
+  // Hors catalogue : nom libre (vente existante sans véhicule du catalogue, ou véhicule absent du panel).
+  const [offCatalog, setOffCatalog] = useState(!!sale && !sale.catalogVehicleId);
   const [typeId, setTypeId] = useState(sale?.vehicleTypeId ?? "");
   const [price, setPrice] = useState(sale ? String(sale.price) : "");
   const [immediate, setImmediate] = useState(sale?.immediate ?? false);
@@ -35,6 +40,36 @@ export function SaleFormModal({
   const [data, setData] = useState<DataRecord>(sale?.data ?? {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadCatalog()
+      .then((list) => {
+        setCatalog(list);
+        if (list.length === 0) setOffCatalog(true);
+        if (sale?.catalogVehicleId) {
+          // Un véhicule retiré du catalogue depuis la vente reste affiché tel quel.
+          setCatalogVehicle(
+            list.find((v) => v.id === sale.catalogVehicleId) ?? {
+              id: sale.catalogVehicleId,
+              name: sale.vehicleName,
+              segmentEmoji: null,
+              segmentLabel: null,
+              vehicleTypeId: null,
+            },
+          );
+        }
+      })
+      .catch(() => {
+        setCatalog([]);
+        setOffCatalog(true);
+      });
+  }, [sale?.catalogVehicleId, sale?.vehicleName]);
+
+  function selectVehicle(v: CatalogVehicle | null) {
+    setCatalogVehicle(v);
+    // Type déduit de la gamme du panel (modifiable ensuite).
+    if (v?.vehicleTypeId && config.vehicleTypes.some((t) => t.id === v.vehicleTypeId && t.active)) setTypeId(v.vehicleTypeId);
+  }
 
   // Types proposés, groupés par catégorie (un type désactivé reste visible s'il est celui de la vente).
   const groups = useMemo(
@@ -52,11 +87,13 @@ export function SaleFormModal({
   const type = config.vehicleTypes.find((t) => t.id === typeId);
   const permitField = type?.permitFieldKey ? config.clientFields.find((f) => f.key === type.permitFieldKey) : undefined;
   const permitMissing = !!type?.permitFieldKey && !clientData[type.permitFieldKey];
-  const requiresPlate = config.categories.find((c) => c.id === type?.categoryId)?.requiresPlate ?? true;
+  const requiresPlate = type?.requiresPlate ?? config.categories.find((c) => c.id === type?.categoryId)?.requiresPlate ?? true;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!offCatalog && !catalogVehicle) return setError("Choisis le véhicule dans le catalogue.");
+    if (offCatalog && !vehicleName.trim()) return setError("Indique le nom du véhicule.");
     if (!typeId) return setError("Choisis le type de véhicule.");
     const p = Number(price.replace(/\s/g, "").replace(",", "."));
     if (!Number.isFinite(p) || p < 0) return setError("Prix de vente invalide.");
@@ -65,7 +102,8 @@ export function SaleFormModal({
     try {
       const body = {
         clientId,
-        vehicleName,
+        catalogVehicleId: offCatalog ? null : catalogVehicle?.id ?? null,
+        vehicleName: offCatalog ? vehicleName : catalogVehicle?.name ?? "",
         vehicleTypeId: typeId,
         price: p,
         immediate: inStock ? false : immediate,
@@ -93,9 +131,34 @@ export function SaleFormModal({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <Label htmlFor="vehicle" required>
-              Nom du véhicule
+              Véhicule
             </Label>
-            <Input id="vehicle" value={vehicleName} onChange={(e) => setVehicleName(e.target.value)} maxLength={120} required autoFocus placeholder="ex : Pegassi Bati 801" />
+            {catalog === null ? (
+              <div className="flex h-10 items-center text-sm text-cream-dim">Chargement du catalogue…</div>
+            ) : offCatalog ? (
+              <Input id="vehicle" value={vehicleName} onChange={(e) => setVehicleName(e.target.value)} maxLength={120} autoFocus placeholder="Nom du véhicule" />
+            ) : (
+              <VehicleSearch catalog={catalog} value={catalogVehicle} onSelect={selectVehicle} autoFocus={!sale} />
+            )}
+            {catalog !== null && catalog.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOffCatalog(!offCatalog);
+                  if (!offCatalog && catalogVehicle) setVehicleName(catalogVehicle.name);
+                }}
+                className="mt-1 text-xs text-cream-dim underline-offset-2 hover:text-cream hover:underline"
+              >
+                {offCatalog ? "← Choisir dans le catalogue" : "Véhicule absent du catalogue ?"}
+              </button>
+            )}
+            {offCatalog && catalog !== null && (
+              <p className="mt-1 text-xs text-sand">
+                {catalog.length === 0
+                  ? "Catalogue vide : importe-le dans Configuration → Catalogue pour des noms uniformes."
+                  : "Hors catalogue : la vente sera comptée à part dans l'analyse."}
+              </p>
+            )}
           </div>
           <div>
             <Label htmlFor="type" required>

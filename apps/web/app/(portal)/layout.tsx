@@ -1,6 +1,6 @@
 "use client";
 
-import { Car, ClipboardList, LayoutDashboard, LogOut, Menu, ScrollText, Settings, Sparkles, Truck, Users, X } from "lucide-react";
+import { BarChart3, Car, ClipboardList, LayoutDashboard, LogOut, Menu, ScrollText, Settings, Sparkles, Truck, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -16,6 +16,7 @@ const NAV = [
   { href: "/tournee", label: "Tournée", icon: Truck, perm: PERM.tourView },
   { href: "/ventes", label: "Ventes", icon: Car, perm: PERM.salesView },
   { href: "/clients", label: "Clients", icon: Users, perm: PERM.clientsView },
+  { href: "/analyse", label: "Analyse", icon: BarChart3, perm: PERM.statsView },
   { href: "/logs", label: "Logs", icon: ScrollText, perm: PERM.logsView },
   { href: "/configuration", label: "Configuration", icon: Settings, perm: PERM.configManage },
 ];

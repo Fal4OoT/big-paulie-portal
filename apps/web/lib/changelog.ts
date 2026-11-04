@@ -18,6 +18,18 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.4.0",
+    date: "2026-11-04",
+    title: "Catalogue des véhicules et analyse",
+    changes: [
+      { kind: "nouveau", text: "Catalogue des véhicules importé depuis le panel légal (Configuration → Catalogue) : copier-coller de la réponse du panel, aperçu des changements avant import." },
+      { kind: "nouveau", text: "Recherche du véhicule dans « Nouvel achat » : noms uniformes, type pré-sélectionné selon la gamme du panel. Un véhicule absent du catalogue reste possible (hors catalogue)." },
+      { kind: "nouveau", text: "Onglet Analyse : véhicules les plus vendus, ventes par gamme, par type et par vendeur, ventes par jour, délai moyen de livraison." },
+      { kind: "nouveau", text: "Type « Vélo » (sans permis ni plaque) et réglage de la plaque par type de véhicule." },
+      { kind: "amélioration", text: "Les anciennes ventes dont le nom correspond exactement à un véhicule du catalogue y sont rattachées automatiquement." },
+    ],
+  },
+  {
     version: "1.3.0",
     date: "2026-11-04",
     title: "Tableau de tournée unique et retards",

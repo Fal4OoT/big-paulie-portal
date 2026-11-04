@@ -3,6 +3,14 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.4.0 — 04/11/2026 · Catalogue des véhicules et analyse
+
+- **Nouveau** : catalogue des véhicules importé depuis le panel légal (Configuration → Catalogue) par copier-coller de la réponse du panel, avec aperçu des changements avant import. Seuls les noms et catégories des véhicules sont lus.
+- **Nouveau** : recherche du véhicule dans « Nouvel achat » : noms uniformes, type pré-sélectionné selon la gamme du panel. Un véhicule absent du catalogue reste possible (hors catalogue).
+- **Nouveau** : onglet Analyse : véhicules les plus vendus, ventes par gamme, par type et par vendeur, ventes par jour, délai moyen de livraison. Permission « Voir l'analyse des ventes » (Patron et Chef de service par défaut).
+- **Nouveau** : type « Vélo » (sans permis ni plaque) et réglage de la plaque par type de véhicule.
+- **Amélioration** : les anciennes ventes dont le nom correspond exactement à un véhicule du catalogue y sont rattachées automatiquement.
+
 ## v1.3.0 — 04/11/2026 · Tableau de tournée unique et retards
 
 - **Amélioration** : le salon de tournée ne contient plus qu'un seul tableau, mis à jour en direct à chaque vente ou changement de statut. Fini le spam.

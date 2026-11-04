@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { FieldDisplay } from "@/components/DynamicFields";
 import { SaleFormModal } from "@/components/SaleForm";
 import { ImmediateBadge, StatusBadge } from "@/components/StatusBadge";
-import { Button, Card, ErrorBox, Input, Label, Modal, PageHeader, Spinner } from "@/components/ui";
+import { Badge, Button, Card, ErrorBox, Input, Label, Modal, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import { cn, formatDateTime, formatMoney, formatPhone } from "@/lib/format";
 import { PERM, useCan, usePortal, useStatus } from "@/lib/portal-context";
@@ -92,6 +92,7 @@ export default function SalePage() {
             <span className="font-mono text-sand">{sale.reference}</span>· {sale.vehicleTypeLabel} · {sale.categoryLabel}
             <StatusBadge status={sale.status} />
             {sale.immediate && <ImmediateBadge />}
+            {!sale.catalogVehicleId && <Badge color="#7C8A99">Hors catalogue</Badge>}
           </span>
         }
         actions={

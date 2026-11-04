@@ -224,11 +224,12 @@ public static partial class ConfigEndpoints
             foreach (var t in input.Types)
             {
                 await c.ExecuteAsync("""
-                    INSERT INTO vehicle_types (id, label, category_id, permit_field_key, sort_order, active)
-                    VALUES (@Id, @Label, @CategoryId, @PermitFieldKey, @order, @Active)
+                    INSERT INTO vehicle_types (id, label, category_id, permit_field_key, sort_order, active, requires_plate)
+                    VALUES (@Id, @Label, @CategoryId, @PermitFieldKey, @order, @Active, @RequiresPlate)
                     ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, category_id = EXCLUDED.category_id,
-                        permit_field_key = EXCLUDED.permit_field_key, sort_order = EXCLUDED.sort_order, active = EXCLUDED.active
-                    """, new { t.Id, t.Label, t.CategoryId, t.PermitFieldKey, order, t.Active }, tx);
+                        permit_field_key = EXCLUDED.permit_field_key, sort_order = EXCLUDED.sort_order, active = EXCLUDED.active,
+                        requires_plate = EXCLUDED.requires_plate
+                    """, new { t.Id, t.Label, t.CategoryId, t.PermitFieldKey, order, t.Active, t.RequiresPlate }, tx);
                 order += 10;
             }
             // Jamais de suppression (des ventes y sont rattachées) : ce qui a disparu de la liste est désactivé.

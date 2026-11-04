@@ -83,5 +83,7 @@ app.MapSales();
 app.MapMisc();
 app.MapConfig();
 app.MapInternal();
+app.MapCatalog();
+app.MapStats();
 
 app.Run();

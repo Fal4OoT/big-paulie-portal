@@ -15,6 +15,8 @@ public static class SaleEndpoints
     public sealed class SaleInput
     {
         public Guid ClientId { get; set; }
+        /// <summary>Véhicule du catalogue (nom uniforme). Null = véhicule hors catalogue, nom libre.</summary>
+        public Guid? CatalogVehicleId { get; set; }
         public string? VehicleName { get; set; }
         public Guid VehicleTypeId { get; set; }
         public decimal? Price { get; set; }
@@ -39,10 +41,10 @@ public static class SaleEndpoints
     }
 
     public const string SelectSale = """
-        SELECT s.id, s.number, s.client_id,
+        SELECT s.id, s.number, s.client_id, s.catalog_vehicle_id,
                trim(coalesce(c.data->>'prenom','') || ' ' || coalesce(c.data->>'nom','')) AS client_name,
                c.data->>'telephone' AS client_phone,
-               s.vehicle_name, s.vehicle_type_id, vt.label AS vehicle_type_label, vc.label AS category_label, vc.requires_plate,
+               s.vehicle_name, s.vehicle_type_id, vt.label AS vehicle_type_label, vc.label AS category_label, coalesce(vt.requires_plate, vc.requires_plate) AS requires_plate,
                s.price, s.immediate, s.from_stock, s.plate, s.status, s.permit_warning, s.data::text AS data_json,
                s.seller_id, u.display_name AS seller_name, s.created_at, s.updated_at, s.delivered_at
         FROM sales s
@@ -60,6 +62,7 @@ public static class SaleEndpoints
         s.ClientId,
         s.ClientName,
         s.ClientPhone,
+        s.CatalogVehicleId,
         s.VehicleName,
         s.VehicleTypeId,
         s.VehicleTypeLabel,
@@ -131,15 +134,15 @@ public static class SaleEndpoints
             AuditService audit) =>
         {
             var me = http.Me();
-            var name = input.VehicleName?.Trim();
-            if (string.IsNullOrEmpty(name) || name.Length > 120) return EndpointAuth.Bad("Nom du véhicule obligatoire (120 caractères max).");
+            await using var c = await db.OpenConnectionAsync();
+            var (name, catalogId, nameError) = await ResolveVehicleNameAsync(c, input, null);
+            if (nameError is not null) return EndpointAuth.Bad(nameError);
             if (input.Price is null || input.Price < 0 || input.Price > 1_000_000_000) return EndpointAuth.Bad("Prix de vente invalide.");
 
             var types = await config.GetVehicleTypesAsync();
             var type = types.FirstOrDefault(t => t.Id == input.VehicleTypeId && t.Active);
             if (type is null) return EndpointAuth.Bad("Type de véhicule invalide.");
 
-            await using var c = await db.OpenConnectionAsync();
             var clientJson = await c.ExecuteScalarAsync<string?>("SELECT data::text FROM clients WHERE id = @id AND deleted_at IS NULL", new { id = input.ClientId });
             if (clientJson is null) return EndpointAuth.NotFound("Client introuvable.");
             var client = FieldValidator.ParseObject(clientJson);
@@ -159,10 +162,10 @@ public static class SaleEndpoints
 
             await using var tx = await c.BeginTransactionAsync();
             var created = await c.QuerySingleAsync<(Guid Id, long Number)>("""
-                INSERT INTO sales (client_id, vehicle_name, vehicle_type_id, price, immediate, from_stock, status, permit_warning, data, seller_id)
-                VALUES (@clientId, @name, @typeId, @price, @immediate, @inStock, @status, @warning, @data::jsonb, @me)
+                INSERT INTO sales (client_id, catalog_vehicle_id, vehicle_name, vehicle_type_id, price, immediate, from_stock, status, permit_warning, data, seller_id)
+                VALUES (@clientId, @catalogId, @name, @typeId, @price, @immediate, @inStock, @status, @warning, @data::jsonb, @me)
                 RETURNING id, number
-                """, new { clientId = input.ClientId, name, typeId = type.Id, price = Math.Round(input.Price.Value, 2), immediate, inStock, status, warning, data = v.Data.ToJsonString(), me = me.Id }, tx);
+                """, new { clientId = input.ClientId, catalogId, name, typeId = type.Id, price = Math.Round(input.Price.Value, 2), immediate, inStock, status, warning, data = v.Data.ToJsonString(), me = me.Id }, tx);
             await c.ExecuteAsync("""
                 INSERT INTO sale_events (sale_id, action, to_status, note, actor_id)
                 VALUES (@id, 'CREATED', @status, @note, @me)
@@ -191,13 +194,13 @@ public static class SaleEndpoints
         g.MapPut("/{id:guid}", async (Guid id, SaleInput input, HttpContext http, NpgsqlDataSource db, ConfigService config, AuditService audit) =>
         {
             var me = http.Me();
-            var name = input.VehicleName?.Trim();
-            if (string.IsNullOrEmpty(name) || name.Length > 120) return EndpointAuth.Bad("Nom du véhicule obligatoire (120 caractères max).");
-            if (input.Price is null || input.Price < 0 || input.Price > 1_000_000_000) return EndpointAuth.Bad("Prix de vente invalide.");
-
             await using var c = await db.OpenConnectionAsync();
             var sale = await c.QuerySingleOrDefaultAsync<SaleView>($"{SelectSale} WHERE s.id = @id", new { id });
             if (sale is null) return EndpointAuth.NotFound("Vente introuvable.");
+
+            var (name, catalogId, nameError) = await ResolveVehicleNameAsync(c, input, sale);
+            if (nameError is not null) return EndpointAuth.Bad(nameError);
+            if (input.Price is null || input.Price < 0 || input.Price > 1_000_000_000) return EndpointAuth.Bad("Prix de vente invalide.");
 
             var types = await config.GetVehicleTypesAsync();
             // Un type désactivé reste accepté s'il est déjà celui de la vente.
@@ -205,7 +208,7 @@ public static class SaleEndpoints
             if (type is null) return EndpointAuth.Bad("Type de véhicule invalide.");
 
             var categories = await config.GetCategoriesAsync();
-            var requiresPlate = categories.FirstOrDefault(x => x.Id == type.CategoryId)?.RequiresPlate ?? true;
+            var requiresPlate = type.RequiresPlate ?? categories.FirstOrDefault(x => x.Id == type.CategoryId)?.RequiresPlate ?? true;
 
             string? plate = sale.Plate;
             if (!requiresPlate) plate = null;
@@ -223,7 +226,8 @@ public static class SaleEndpoints
             var warning = HasPermitWarning(type, FieldValidator.ParseObject(clientJson));
 
             var changes = new List<string>();
-            if (sale.VehicleName != name) changes.Add($"véhicule : {sale.VehicleName} → {name}");
+            if (sale.VehicleName != name || sale.CatalogVehicleId != catalogId)
+                changes.Add($"véhicule : {sale.VehicleName} → {name}{(catalogId is null ? " (hors catalogue)" : "")}");
             if (sale.VehicleTypeId != type.Id) changes.Add($"type : {sale.VehicleTypeLabel} → {type.Label}");
             if (sale.Price != Math.Round(input.Price.Value, 2)) changes.Add($"prix : {Money(sale.Price)} → {Money(input.Price.Value)}");
             if (sale.Immediate != input.Immediate) changes.Add(input.Immediate ? "passée en immédiat" : "n'est plus immédiate");
@@ -235,10 +239,10 @@ public static class SaleEndpoints
             {
                 await using var tx = await c.BeginTransactionAsync();
                 await c.ExecuteAsync("""
-                    UPDATE sales SET vehicle_name = @name, vehicle_type_id = @typeId, price = @price, immediate = @immediate,
+                    UPDATE sales SET catalog_vehicle_id = @catalogId, vehicle_name = @name, vehicle_type_id = @typeId, price = @price, immediate = @immediate,
                                      plate = @plate, permit_warning = @warning, data = @data::jsonb, updated_at = now()
                     WHERE id = @id
-                    """, new { id, name, typeId = type.Id, price = Math.Round(input.Price.Value, 2), immediate = input.Immediate, plate, warning, data = v.Data.ToJsonString() }, tx);
+                    """, new { id, catalogId, name, typeId = type.Id, price = Math.Round(input.Price.Value, 2), immediate = input.Immediate, plate, warning, data = v.Data.ToJsonString() }, tx);
                 await c.ExecuteAsync("INSERT INTO sale_events (sale_id, action, note, actor_id) VALUES (@id, 'EDITED', @note, @me)",
                     new { id, note = string.Join(" · ", changes), me = me.Id }, tx);
                 await tx.CommitAsync();
@@ -303,6 +307,27 @@ public static class SaleEndpoints
             if (done.Count > 0) http.RefreshTourBoard();
             return Results.Ok(new { updated = done.Count, failed = errors.Count });
         }).RequirePerm(Permissions.SalesAdvance);
+    }
+
+    /// <summary>
+    /// Nom du véhicule : celui du catalogue quand un véhicule est choisi (noms uniformes pour l'analyse),
+    /// sinon le nom libre saisi (hors catalogue).
+    /// </summary>
+    private static async Task<(string Name, Guid? CatalogId, string? Error)> ResolveVehicleNameAsync(
+        NpgsqlConnection c, SaleInput input, SaleView? current)
+    {
+        if (input.CatalogVehicleId is { } cid)
+        {
+            // Un véhicule retiré du catalogue reste accepté s'il est déjà celui de la vente.
+            var cvName = await c.ExecuteScalarAsync<string?>(
+                "SELECT name FROM catalog_vehicles WHERE id = @cid AND (active OR @cid = @currentId)",
+                new { cid, currentId = current?.CatalogVehicleId });
+            return cvName is null ? ("", null, "Véhicule introuvable dans le catalogue.") : (cvName, cid, null);
+        }
+
+        var name = input.VehicleName?.Trim();
+        if (string.IsNullOrEmpty(name) || name.Length > 120) return ("", null, "Nom du véhicule obligatoire (120 caractères max).");
+        return (name, null, null);
     }
 
     public sealed record ChangeResult(IResult? Error, SaleView? Sale = null, string? From = null, string? Plate = null);
