@@ -3,6 +3,10 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.9.2 — 05/11/2026 · Suppression d'un partenariat
+
+- **Amélioration** : un partenariat peut être supprimé définitivement (Configuration → Avantages clients → Partenariats), en plus d'être désactivé. Ses customisations validées sont supprimées avec lui et les grades reliés sont détachés (pas supprimés). Le détail est affiché avant de confirmer.
+
 ## v1.9.1 — 05/11/2026 · Correctif
 
 - **Correction** : menu : « Partenaires » n'allume plus aussi « Espace partenaire ».

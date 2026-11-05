@@ -265,6 +265,37 @@ public static partial class PartnerEndpoints
         }).RequirePerm(Permissions.PartnersCancel);
 
         // ---------- Configuration ----------
+        // Ce qui sera touché par une suppression (affiché avant de confirmer).
+        app.MapGet("/api/admin/partners/{id:guid}/usage", async (Guid id, NpgsqlDataSource db) =>
+        {
+            await using var c = await db.OpenConnectionAsync();
+            var name = await c.ExecuteScalarAsync<string?>("SELECT name FROM partners WHERE id = @id", new { id });
+            if (name is null) return EndpointAuth.NotFound("Partenaire introuvable.");
+            var validations = await c.ExecuteScalarAsync<int>(
+                "SELECT count(*)::int FROM partner_validations WHERE partner_id = @id AND cancelled_at IS NULL", new { id });
+            var grades = await c.QueryAsync<string>("SELECT name FROM grades WHERE partner_id = @id ORDER BY name", new { id });
+            return Results.Ok(new { name, validations, grades });
+        }).RequirePerm(Permissions.ConfigManage);
+
+        // Suppression définitive : les validations du partenaire sont supprimées, ses grades détachés.
+        app.MapDelete("/api/admin/partners/{id:guid}", async (Guid id, HttpContext http, NpgsqlDataSource db, AuditService audit) =>
+        {
+            await using var c = await db.OpenConnectionAsync();
+            await using var tx = await c.BeginTransactionAsync();
+            var name = await c.ExecuteScalarAsync<string?>("SELECT name FROM partners WHERE id = @id FOR UPDATE", new { id }, tx);
+            if (name is null) return EndpointAuth.NotFound("Partenaire introuvable.");
+            var validations = await c.ExecuteAsync("DELETE FROM partner_validations WHERE partner_id = @id", new { id }, tx);
+            var grades = (await c.QueryAsync<string>("UPDATE grades SET partner_id = NULL WHERE partner_id = @id RETURNING name", new { id }, tx)).ToList();
+            await c.ExecuteAsync("DELETE FROM partners WHERE id = @id", new { id }, tx);
+            await tx.CommitAsync();
+
+            await audit.LogAsync(http.Me(), "config.partners.deleted", "config", id.ToString(), "Partenariat supprimé",
+                $"**{name}** a été supprimé" +
+                (validations > 0 ? $", avec {validations} customisation(s) enregistrée(s)" : "") +
+                (grades.Count > 0 ? $". Grade(s) détaché(s) : {string.Join(", ", grades)}" : "") + ".");
+            return Results.Ok(new { ok = true });
+        }).RequirePerm(Permissions.ConfigManage);
+
         app.MapGet("/api/admin/partners", async (NpgsqlDataSource db) =>
         {
             await using var c = await db.OpenConnectionAsync();

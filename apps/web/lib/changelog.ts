@@ -18,6 +18,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.9.2",
+    date: "2026-11-05",
+    title: "Suppression d'un partenariat",
+    changes: [
+      { kind: "amélioration", text: "Un partenariat peut être supprimé définitivement (en plus d'être désactivé). Avant de confirmer, le portail indique les customisations qui seront supprimées et les grades qui seront détachés." },
+    ],
+  },
+  {
     version: "1.9.1",
     date: "2026-11-05",
     title: "Correctif",

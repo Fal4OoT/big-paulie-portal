@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/format";
@@ -37,6 +37,38 @@ export function PartnersEditor({ admin }: { admin: AdminConfig }) {
     setDone(false);
     setList((l) => l.map((p, j) => (j === i ? { ...p, ...patch } : p)));
   };
+
+  async function remove(i: number) {
+    const p = list[i];
+    // Partenaire pas encore enregistré : on le retire simplement de la liste.
+    if (!initial?.some((x) => x.id === p.id)) {
+      setList((l) => l.filter((_, j) => j !== i));
+      return;
+    }
+    if (dirty && !confirm("Tu as des modifications non enregistrées sur les partenariats : elles seront perdues. Continuer ?")) return;
+    setError(null);
+    try {
+      const u = await api.get<{ name: string; validations: number; grades: string[] }>(`/api/admin/partners/${p.id}/usage`);
+      const lines = [
+        `Supprimer définitivement le partenariat « ${u.name} » ?`,
+        "",
+        u.validations > 0
+          ? `• ${u.validations} customisation(s) validée(s) seront supprimées (historique et statistiques).`
+          : "• Aucune customisation enregistrée.",
+        u.grades.length > 0
+          ? `• Grade(s) détaché(s) du partenaire, sans être supprimé(s) : ${u.grades.join(", ")}. Leurs comptes perdront l'accès à l'espace partenaire.`
+          : "• Aucun grade relié.",
+        "",
+        "Pour garder l'historique, décoche plutôt « Actif ».",
+      ];
+      if (!confirm(lines.join("\n"))) return;
+      await api.del(`/api/admin/partners/${p.id}`);
+      await Promise.all([load(), reloadConfig()]);
+      setDone(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Suppression impossible.");
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -148,6 +180,7 @@ export function PartnersEditor({ admin }: { admin: AdminConfig }) {
             </div>
 
             <div className="grid items-end gap-4 md:grid-cols-[1fr_auto]">
+              {/* Salon Discord, puis Actif / Supprimer */}
               <div>
                 <Label>Salon Discord du partenaire (nouveaux véhicules éligibles)</Label>
                 {admin.discordChannels.length > 0 ? (
@@ -163,7 +196,12 @@ export function PartnersEditor({ admin }: { admin: AdminConfig }) {
                   <Input value={p.channelId ?? ""} onChange={(e) => upd(i, { channelId: e.target.value.trim() || null })} placeholder="ID du salon" />
                 )}
               </div>
-              <Toggle checked={p.active} onChange={(v) => upd(i, { active: v })} label="Actif" />
+              <div className="flex items-center gap-4">
+                <Toggle checked={p.active} onChange={(v) => upd(i, { active: v })} label="Actif" />
+                <Button type="button" size="sm" variant="danger" onClick={() => remove(i)} title="Supprimer le partenariat">
+                  <Trash2 className="h-4 w-4" /> Supprimer
+                </Button>
+              </div>
             </div>
           </div>
         ))}
