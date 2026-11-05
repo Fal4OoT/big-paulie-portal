@@ -3,6 +3,14 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.9.0 — 05/11/2026 · Partenariat customisation et onglet Avantages clients
+
+- **Nouveau** : partenariats (Configuration → Avantages clients) : réduction pour le client qui se présente chez le partenaire avec son véhicule dans les X heures suivant la livraison, catégories concernées (terrestre par défaut), précisions client, contrat pour nos employés, salon Discord du partenaire (annonce des véhicules éligibles et des validations).
+- **Nouveau** : espace partenaire. Les employés du partenaire (grade relié à leur rôle Discord et au partenaire, permissions « Espace partenaire » et « Valider une customisation ») voient les véhicules éligibles avec le temps restant (véhicule, plaque, client, sans téléphone ni prix), valident la customisation avec le montant facturé et une note, consultent l'historique, la liste de nos employés et le contrat. Ils ne voient rien d'autre du portail.
+- **Nouveau** : page Partenaires (permission « Voir les partenariats ») : ce que chaque partenaire offre, statistiques (nombre et montant des customisations sur 30 jours et au total), dernières validations, annulables par le Patron (« Annuler une customisation validée »).
+- **Amélioration** : au passage en « Livré », la fenêtre rappelle la réduction partenaire à annoncer au client ; la fiche de la vente indique le délai restant ou la customisation validée.
+- **Amélioration** : nouvel onglet « Avantages clients » dans la configuration (coupons, fidélité, parrainage, cadeaux, partenariats).
+
 ## v1.8.1 — 05/11/2026 · Correctif
 
 - **Correction** : la v1.8.0 ne se construisait pas (import manquant dans les réglages des cadeaux).

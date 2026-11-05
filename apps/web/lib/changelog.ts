@@ -18,6 +18,18 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.9.0",
+    date: "2026-11-05",
+    title: "Partenariat customisation et onglet Avantages clients",
+    changes: [
+      { kind: "nouveau", text: "Partenariats (Configuration → Avantages clients) : réduction pour le client qui se présente chez le partenaire avec son véhicule dans les X heures suivant la livraison, catégories concernées (terrestre par défaut), contrat pour nos employés, salon Discord du partenaire." },
+      { kind: "nouveau", text: "Espace partenaire : les employés du partenaire (grade relié à leur rôle Discord) voient les véhicules éligibles avec le temps restant, valident la customisation avec le montant facturé, consultent l'historique, nos employés et le contrat. Ils ne voient rien d'autre du portail." },
+      { kind: "nouveau", text: "Page Partenaires : ce que chaque partenaire offre, statistiques des customisations (nombre, montant) et dernières validations, annulables par le Patron." },
+      { kind: "amélioration", text: "Au passage en « Livré », la fenêtre rappelle la réduction partenaire à annoncer au client ; la fiche de la vente indique le délai restant ou la customisation validée." },
+      { kind: "amélioration", text: "Nouvel onglet « Avantages clients » dans la configuration : coupons, fidélité, parrainage, cadeaux et partenariats au même endroit." },
+    ],
+  },
+  {
     version: "1.8.1",
     date: "2026-11-05",
     title: "Correctif",

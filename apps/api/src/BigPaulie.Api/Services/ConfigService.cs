@@ -59,6 +59,6 @@ public sealed class ConfigService
     public async Task<List<GradeRow>> GetGradesAsync()
     {
         await using var c = await _db.OpenConnectionAsync();
-        return (await c.QueryAsync<GradeRow>("SELECT id, name, discord_role_id, priority, is_staff, permissions FROM grades ORDER BY priority DESC, name")).ToList();
+        return (await c.QueryAsync<GradeRow>("SELECT id, name, discord_role_id, priority, is_staff, partner_id, permissions FROM grades ORDER BY priority DESC, name")).ToList();
     }
 }

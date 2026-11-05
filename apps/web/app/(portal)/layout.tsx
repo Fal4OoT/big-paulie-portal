@@ -1,8 +1,8 @@
 "use client";
 
-import { BarChart3, Car, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu, ScrollText, Settings, Sparkles, Truck, Users, X } from "lucide-react";
+import { BarChart3, Car, ClipboardList, GraduationCap, Handshake, LayoutDashboard, Wrench, LogOut, Menu, ScrollText, Settings, Sparkles, Truck, Users, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Spinner } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
@@ -17,6 +17,8 @@ const NAV = [
   { href: "/ventes", label: "Ventes", icon: Car, perm: PERM.salesView },
   { href: "/clients", label: "Clients", icon: Users, perm: PERM.clientsView },
   { href: "/analyse", label: "Analyse", icon: BarChart3, perm: PERM.statsView },
+  { href: "/partenaire", label: "Espace partenaire", icon: Wrench, perm: PERM.partnerSpace },
+  { href: "/partenaires", label: "Partenaires", icon: Handshake, perm: PERM.partnersView },
   { href: "/formation", label: "Formation", icon: GraduationCap, perm: PERM.trainingView },
   { href: "/logs", label: "Logs", icon: ScrollText, perm: PERM.logsView },
   { href: "/configuration", label: "Configuration", icon: Settings, perm: PERM.configManage },
@@ -65,6 +67,16 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
   }, [reloadConfig]);
 
   useEffect(() => setMenuOpen(false), [pathname]);
+
+  // Accès limité (ex : employés d'un partenaire) : l'accueil renvoie vers la première page autorisée.
+  const router = useRouter();
+  useEffect(() => {
+    if (!me || pathname !== "/") return;
+    const allowed = (p: string) => me.isAdmin || me.permissions.includes(p);
+    if (allowed(PERM.salesView)) return;
+    const first = NAV.find((n) => allowed(n.perm));
+    if (first) router.replace(first.href);
+  }, [me, pathname, router]);
 
   if (fatal) {
     return <div className="p-10 text-center text-red-300">{fatal}</div>;

@@ -23,6 +23,8 @@ public sealed class GradeRow
     public string? DiscordRoleId { get; set; }
     public int Priority { get; set; }
     public bool IsStaff { get; set; }
+    /// <summary>Grade des employés d'un partenaire (accès limité à l'espace partenaire).</summary>
+    public Guid? PartnerId { get; set; }
     public string[] Permissions { get; set; } = Array.Empty<string>();
 }
 
@@ -160,6 +162,7 @@ public sealed class SaleView
     public string VehicleName { get; set; } = "";
     public Guid VehicleTypeId { get; set; }
     public string VehicleTypeLabel { get; set; } = "";
+    public Guid CategoryId { get; set; }
     public string CategoryLabel { get; set; } = "";
     public bool RequiresPlate { get; set; }
     public decimal Price { get; set; }

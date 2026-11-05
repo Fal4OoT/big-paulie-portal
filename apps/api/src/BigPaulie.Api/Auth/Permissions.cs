@@ -18,6 +18,10 @@ public static class Permissions
     public const string ReferralsManage = "referrals.manage";
     public const string TourView = "tour.view";
     public const string StatsView = "stats.view";
+    public const string PartnersView = "partners.view";
+    public const string PartnersCancel = "partners.cancel";
+    public const string PartnerSpace = "partner.space";
+    public const string PartnerValidate = "partner.validate";
     public const string TrainingView = "training.view";
     public const string TrainingManage = "training.manage";
     public const string LogsView = "logs.view";
@@ -42,6 +46,10 @@ public static class Permissions
         new(ReferralsManage, "Enregistrer un parrainage", "Clients"),
         new(TourView, "Voir la tournée", "Logistique"),
         new(StatsView, "Voir l'analyse des ventes", "Logistique"),
+        new(PartnersView, "Voir les partenariats (contrats, customisations)", "Partenariat"),
+        new(PartnersCancel, "Annuler une customisation validée", "Partenariat"),
+        new(PartnerSpace, "Espace partenaire (véhicules éligibles, nos employés)", "Partenariat"),
+        new(PartnerValidate, "Valider une customisation (partenaire)", "Partenariat"),
         new(TrainingView, "Voir les formations", "Formation"),
         new(TrainingManage, "Créer / modifier les formations", "Formation"),
         new(LogsView, "Voir les logs", "Administration"),

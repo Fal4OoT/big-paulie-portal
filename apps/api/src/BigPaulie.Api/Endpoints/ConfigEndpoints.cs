@@ -60,9 +60,11 @@ public static partial class ConfigEndpoints
     public static void MapConfig(this WebApplication app)
     {
         // Lecture : utile à tous les formulaires.
-        app.MapGet("/api/config", async (ConfigService config) =>
+        app.MapGet("/api/config", async (ConfigService config, NpgsqlDataSource db) =>
         {
             var settings = await config.GetSettingsAsync();
+            await using var c = await db.OpenConnectionAsync();
+            var partners = await PartnerEndpoints.GetPartnersAsync(c, activeOnly: true);
             return Results.Ok(new
             {
                 clientFields = await config.GetFieldsAsync("client"),
@@ -74,6 +76,7 @@ public static partial class ConfigEndpoints
                 referralEnabled = settings.ReferralEnabled,
                 giftsEnabled = settings.GiftsEnabled,
                 giftTiers = settings.GiftTiers,
+                partners = partners.Select(p => new { p.Id, p.Name, p.DiscountPercent, p.WindowHours, p.CategoryIds, p.ClientTerms }),
             });
         }).RequirePerm();
 
@@ -283,16 +286,19 @@ public static partial class ConfigEndpoints
             }
 
             await using var c = await db.OpenConnectionAsync();
+            var partnerIds = (await PartnerEndpoints.GetPartnersAsync(c)).Select(p => p.Id).ToHashSet();
+            var badPartner = input.FirstOrDefault(gr => gr.PartnerId is { } pid && !partnerIds.Contains(pid));
+            if (badPartner is not null) return EndpointAuth.Bad($"Partenaire inconnu pour le grade « {badPartner.Name} ».");
             await using var tx = await c.BeginTransactionAsync();
             var ids = input.Select(gr => gr.Id).ToArray();
             await c.ExecuteAsync("DELETE FROM grades WHERE NOT (id = ANY(@ids))", new { ids }, tx);
             foreach (var gr in input)
                 await c.ExecuteAsync("""
-                    INSERT INTO grades (id, name, discord_role_id, priority, is_staff, permissions)
-                    VALUES (@Id, @Name, @DiscordRoleId, @Priority, @IsStaff, @Permissions)
+                    INSERT INTO grades (id, name, discord_role_id, priority, is_staff, partner_id, permissions)
+                    VALUES (@Id, @Name, @DiscordRoleId, @Priority, @IsStaff, @PartnerId, @Permissions)
                     ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, discord_role_id = EXCLUDED.discord_role_id,
-                        priority = EXCLUDED.priority, is_staff = EXCLUDED.is_staff, permissions = EXCLUDED.permissions
-                    """, new { gr.Id, gr.Name, gr.DiscordRoleId, gr.Priority, gr.IsStaff, gr.Permissions }, tx);
+                        priority = EXCLUDED.priority, is_staff = EXCLUDED.is_staff, partner_id = EXCLUDED.partner_id, permissions = EXCLUDED.permissions
+                    """, new { gr.Id, gr.Name, gr.DiscordRoleId, gr.Priority, gr.IsStaff, gr.PartnerId, gr.Permissions }, tx);
             await tx.CommitAsync();
 
             await audit.LogAsync(me, "config.grades", "config", null, "Configuration modifiée",

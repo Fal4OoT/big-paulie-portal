@@ -48,7 +48,7 @@ public static class SaleEndpoints
         SELECT s.id, s.number, s.client_id, s.catalog_vehicle_id,
                trim(coalesce(c.data->>'prenom','') || ' ' || coalesce(c.data->>'nom','')) AS client_name,
                c.data->>'telephone' AS client_phone,
-               s.vehicle_name, s.vehicle_type_id, vt.label AS vehicle_type_label, vc.label AS category_label, coalesce(vt.requires_plate, vc.requires_plate) AS requires_plate,
+               s.vehicle_name, s.vehicle_type_id, vt.label AS vehicle_type_label, vt.category_id, vc.label AS category_label, coalesce(vt.requires_plate, vc.requires_plate) AS requires_plate,
                s.price, s.immediate, s.from_stock, s.coupon_id, cp.number AS coupon_number, cp.percent AS coupon_percent, cp.reason AS coupon_reason, s.gift, s.plate, s.status, s.permit_warning, s.data::text AS data_json,
                s.seller_id, u.display_name AS seller_name, s.created_at, s.updated_at, s.delivered_at
         FROM sales s
@@ -71,6 +71,7 @@ public static class SaleEndpoints
         s.VehicleName,
         s.VehicleTypeId,
         s.VehicleTypeLabel,
+        s.CategoryId,
         s.CategoryLabel,
         s.RequiresPlate,
         s.Price,
@@ -132,12 +133,30 @@ public static class SaleEndpoints
             await using var c = await db.OpenConnectionAsync();
             var sale = await c.QuerySingleOrDefaultAsync<SaleView>($"{SelectSale} WHERE s.id = @id", new { id });
             if (sale is null) return EndpointAuth.NotFound("Vente introuvable.");
+            var partnerValidations = await c.QueryAsync("""
+                SELECT pv.id, p.name AS partner_name, pv.amount, pv.note, pv.validated_at, u.display_name AS validated_by_name
+                FROM partner_validations pv JOIN partners p ON p.id = pv.partner_id LEFT JOIN users u ON u.id = pv.validated_by
+                WHERE pv.sale_id = @id AND pv.cancelled_at IS NULL ORDER BY pv.validated_at
+                """, new { id });
             var events = await c.QueryAsync<SaleEventView>("""
                 SELECT e.id, e.action, e.from_status, e.to_status, e.note, e.actor_id, u.display_name AS actor_name, e.at
                 FROM sale_events e LEFT JOIN users u ON u.id = e.actor_id
                 WHERE e.sale_id = @id ORDER BY e.at, e.id
                 """, new { id });
-            return Results.Ok(new { sale = ToDto(sale), events });
+            return Results.Ok(new
+            {
+                sale = ToDto(sale),
+                events,
+                partnerValidations = partnerValidations.Select(v => new
+                {
+                    id = (Guid)v.id,
+                    partnerName = (string)v.partner_name,
+                    amount = (decimal?)v.amount,
+                    note = (string?)v.note,
+                    validatedAt = (DateTime)v.validated_at,
+                    validatedByName = (string?)v.validated_by_name,
+                }),
+            });
         }).RequirePerm(Permissions.SalesView);
 
         g.MapPost("/", async (SaleInput input, HttpContext http, NpgsqlDataSource db, ConfigService config,
@@ -303,7 +322,7 @@ public static class SaleEndpoints
         }).RequirePerm(Permissions.SalesEdit);
 
         g.MapPost("/{id:guid}/status", async (Guid id, StatusInput input, HttpContext http, NpgsqlDataSource db,
-            ConfigService config, AuditService audit) =>
+            ConfigService config, AuditService audit, DiscordNotifier notifier, PortalOptions opt) =>
         {
             var me = http.Me();
             await using var c = await db.OpenConnectionAsync();
@@ -312,6 +331,10 @@ public static class SaleEndpoints
             if (result.Error is not null) return result.Error;
 
             var s = result.Sale!;
+            // Livraison : le véhicule devient éligible aux partenariats (annonce dans le salon de chaque partenaire).
+            if (input.To == SaleStatus.Delivered)
+                foreach (var partner in await PartnerEndpoints.AnnounceDeliveredAsync(c, s, s.CategoryId, notifier, opt))
+                    (result.Notes ?? new()).Add($"🔧 Éligible partenariat : {partner}");
             await audit.LogAsync(me, input.To == SaleStatus.Cancelled ? "sale.cancelled" : "sale.status", "sale", id.ToString(),
                 $"Vente {Ref(s.Number)} : {settings.StatusLabel(result.From!)} → {settings.StatusLabel(input.To!)}",
                 $"**{s.VehicleName}** ({s.VehicleTypeLabel}) pour **{s.ClientName}**" +

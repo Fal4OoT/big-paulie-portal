@@ -37,6 +37,7 @@ Dépôt **autonome** : il ne dépend d'aucun autre projet (notamment pas du port
   Page Tournée avec cases à cocher et actions groupées.
 - **Formation** : fiches métier (Markdown simple, images collées), créées par le Patron.
 - **Cadeaux à la livraison** : paliers selon le prix de vente, signalés au passage en « Livré ».
+- **Partenariat** (garage de customisation) : réduction client après livraison, espace dédié au partenaire (véhicules éligibles, validation avec montant, nos employés, contrat).
 - **Logs** : toutes les actions sont enregistrées et publiées dans un salon Discord de logs.
 - **Bot** : `/client`, `/vente`, `/tournee` (réponses visibles par toi seul, droits selon tes rôles).
 

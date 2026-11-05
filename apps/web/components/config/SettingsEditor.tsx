@@ -7,7 +7,16 @@ import type { AdminConfig, GiftTier, PortalSettings } from "@/lib/types";
 import { Badge, Button, Card, Input, Label, Select, Toggle } from "../ui";
 import { SaveBar, stableJson } from "./SaveBar";
 
-export function SettingsEditor({ admin, onSaved }: { admin: AdminConfig; onSaved: () => Promise<void> }) {
+/** Réglages généraux. « section » choisit la partie affichée (onglets de la configuration), l'enregistrement envoie tout. */
+export function SettingsEditor({
+  admin,
+  onSaved,
+  section = "discord",
+}: {
+  admin: AdminConfig;
+  onSaved: () => Promise<void>;
+  section?: "discord" | "advantages";
+}) {
   const { reloadConfig } = usePortal();
   const [s, setS] = useState<PortalSettings>(admin.settings);
   const [saving, setSaving] = useState(false);
@@ -71,6 +80,8 @@ export function SettingsEditor({ admin, onSaved }: { admin: AdminConfig; onSaved
 
   return (
     <div className="space-y-6">
+      {section === "discord" && (
+      <>
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Logs">
           <Label>Salon de logs</Label>
@@ -131,6 +142,11 @@ export function SettingsEditor({ admin, onSaved }: { admin: AdminConfig; onSaved
         </p>
       </Card>
 
+      </>
+      )}
+
+      {section === "advantages" && (
+      <>
       <Card title="Coupons & fidélité">
         <div className="space-y-5">
           <div>
@@ -327,6 +343,10 @@ export function SettingsEditor({ admin, onSaved }: { admin: AdminConfig; onSaved
         </div>
       </Card>
 
+      </>
+      )}
+
+      {section === "discord" && (
       <Card title="Statuts des ventes">
         <p className="mb-4 text-sm text-cream-muted">
           Le circuit est fixe (la tournée et la livraison en dépendent), mais les libellés et couleurs sont libres.
@@ -351,6 +371,8 @@ export function SettingsEditor({ admin, onSaved }: { admin: AdminConfig; onSaved
           ))}
         </div>
       </Card>
+
+      )}
 
       <SaveBar dirty={dirty} saving={saving} error={error} done={done} onSave={save} onReset={() => setS(admin.settings)} />
     </div>

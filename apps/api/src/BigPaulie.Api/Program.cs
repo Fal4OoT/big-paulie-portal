@@ -88,5 +88,6 @@ app.MapStats();
 app.MapCoupons();
 app.MapReferrals();
 app.MapTraining();
+app.MapPartners();
 
 app.Run();

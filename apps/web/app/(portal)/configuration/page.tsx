@@ -5,6 +5,7 @@ import { CatalogEditor } from "@/components/config/CatalogEditor";
 import { FieldsEditor } from "@/components/config/FieldsEditor";
 import { GradesEditor } from "@/components/config/GradesEditor";
 import { MembersList } from "@/components/config/MembersList";
+import { PartnersEditor } from "@/components/config/PartnersEditor";
 import { SettingsEditor } from "@/components/config/SettingsEditor";
 import { VehiclesEditor } from "@/components/config/VehiclesEditor";
 import { ErrorBox, PageHeader, Spinner } from "@/components/ui";
@@ -20,6 +21,7 @@ const TABS = [
   { key: "vehicles", label: "Véhicules" },
   { key: "catalog", label: "Catalogue" },
   { key: "discord", label: "Discord, tournée & statuts" },
+  { key: "advantages", label: "Avantages clients" },
   { key: "members", label: "Membres" },
 ] as const;
 
@@ -65,7 +67,7 @@ export default function ConfigurationPage() {
       </div>
 
       <ErrorBox message={error} />
-      {admin?.discordError && (tab === "grades" || tab === "discord") && (
+      {admin?.discordError && (tab === "grades" || tab === "discord" || tab === "advantages") && (
         <div className="mb-4">
           <ErrorBox message={admin.discordError} />
         </div>
@@ -76,13 +78,18 @@ export default function ConfigurationPage() {
       {tab === "vehicles" && <VehiclesEditor />}
       {tab === "catalog" && <CatalogEditor />}
       {tab === "members" && <MembersList />}
-      {(tab === "grades" || tab === "discord") &&
+      {(tab === "grades" || tab === "discord" || tab === "advantages") &&
         (!admin ? (
           <Spinner />
         ) : tab === "grades" ? (
           <GradesEditor admin={admin} onSaved={loadAdmin} />
+        ) : tab === "advantages" ? (
+          <div className="space-y-6">
+            <SettingsEditor admin={admin} onSaved={loadAdmin} section="advantages" />
+            <PartnersEditor admin={admin} />
+          </div>
         ) : (
-          <SettingsEditor admin={admin} onSaved={loadAdmin} />
+          <SettingsEditor admin={admin} onSaved={loadAdmin} section="discord" />
         ))}
     </>
   );

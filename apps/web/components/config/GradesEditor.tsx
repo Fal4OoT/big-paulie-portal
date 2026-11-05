@@ -60,7 +60,7 @@ export function GradesEditor({ admin, onSaved }: { admin: AdminConfig; onSaved: 
             size="sm"
             variant="secondary"
             onClick={() =>
-              setGrades((g) => [...g, { id: "00000000-0000-0000-0000-000000000000", name: "Nouveau grade", discordRoleId: null, priority: 0, isStaff: false, permissions: [] }])
+              setGrades((g) => [...g, { id: "00000000-0000-0000-0000-000000000000", name: "Nouveau grade", discordRoleId: null, priority: 0, isStaff: false, partnerId: null, permissions: [] }])
             }
           >
             <Plus className="h-4 w-4" /> Ajouter
@@ -73,7 +73,7 @@ export function GradesEditor({ admin, onSaved }: { admin: AdminConfig; onSaved: 
         </p>
         <div className="space-y-3">
           {grades.map((g, i) => (
-            <div key={i} className="grid items-end gap-3 rounded-lg border border-night-500/70 bg-night-900/50 p-3 md:grid-cols-[1fr_1.2fr_auto_auto]">
+            <div key={i} className="grid items-end gap-3 rounded-lg border border-night-500/70 bg-night-900/50 p-3 md:grid-cols-[1fr_1.2fr_1fr_auto_auto]">
               <div>
                 <Label>Nom</Label>
                 <Input value={g.name} onChange={(e) => update(i, { name: e.target.value })} maxLength={40} />
@@ -93,6 +93,18 @@ export function GradesEditor({ admin, onSaved }: { admin: AdminConfig; onSaved: 
                 ) : (
                   <Input value={g.discordRoleId ?? ""} onChange={(e) => update(i, { discordRoleId: e.target.value.trim() || null })} placeholder="ID du rôle" />
                 )}
+              </div>
+              <div>
+                <Label>Partenaire</Label>
+                <Select value={g.partnerId ?? ""} onChange={(e) => update(i, { partnerId: e.target.value || null })}>
+                  <option value="">— Concession —</option>
+                  {config.partners.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                  {g.partnerId && !config.partners.some((p) => p.id === g.partnerId) && <option value={g.partnerId}>Partenaire inactif</option>}
+                </Select>
               </div>
               <label className="flex h-10 items-center gap-2 text-sm" title="Accès staff du serveur (hors grades de la concession)">
                 <input type="checkbox" checked={g.isStaff} onChange={(e) => update(i, { isStaff: e.target.checked })} className="h-4 w-4 accent-[#D9A441]" />

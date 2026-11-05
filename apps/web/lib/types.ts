@@ -176,6 +176,67 @@ export interface PortalConfig {
   referralEnabled: boolean;
   giftsEnabled: boolean;
   giftTiers: GiftTier[];
+  partners: PartnerPublic[];
+}
+
+export interface PartnerPublic {
+  id: string;
+  name: string;
+  discountPercent: number;
+  windowHours: number;
+  categoryIds: string[];
+  clientTerms: string;
+}
+
+export interface PartnerConfig extends PartnerPublic {
+  active: boolean;
+  contractTerms: string;
+  channelId: string | null;
+}
+
+export interface PartnerEligible {
+  saleId: string;
+  number: number;
+  vehicleName: string;
+  vehicleTypeLabel: string;
+  plate: string | null;
+  clientName: string;
+  deliveredAt: string;
+  expiresAt: string;
+  validationId: string | null;
+  amount: number | null;
+  note: string | null;
+  validatedAt: string | null;
+  validatedByName: string | null;
+}
+
+export interface PartnerValidation {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  saleId: string;
+  number: number;
+  vehicleName: string;
+  plate: string | null;
+  clientName: string;
+  deliveredAt: string | null;
+  amount: number | null;
+  note: string | null;
+  validatedAt: string;
+  validatedByName: string | null;
+}
+
+export interface PartnerSpace {
+  partner: { id: string; name: string; discountPercent: number; windowHours: number; contractTerms: string; clientTerms: string };
+  eligible: PartnerEligible[];
+  history: PartnerValidation[];
+  employees: { name: string; grade: string | null; avatarUrl: string | null }[];
+  canValidate: boolean;
+}
+
+export interface PartnersOverview {
+  partners: (PartnerConfig & { stats: { count30: number; amount30: number; countAll: number; amountAll: number } })[];
+  recent: PartnerValidation[];
 }
 
 export interface GiftTier {
@@ -252,6 +313,7 @@ export interface Sale {
   vehicleName: string;
   vehicleTypeId: string;
   vehicleTypeLabel: string;
+  categoryId: string;
   categoryLabel: string;
   requiresPlate: boolean;
   price: number;
@@ -274,6 +336,15 @@ export interface Sale {
   deliveredAt: string | null;
 }
 
+export interface SalePartnerValidation {
+  id: string;
+  partnerName: string;
+  amount: number | null;
+  note: string | null;
+  validatedAt: string;
+  validatedByName: string | null;
+}
+
 export interface SaleEvent {
   id: string;
   action: "CREATED" | "STATUS" | "EDITED" | "CANCELLED" | "RESTORED";
@@ -291,6 +362,7 @@ export interface Grade {
   discordRoleId: string | null;
   priority: number;
   isStaff: boolean;
+  partnerId: string | null;
   permissions: string[];
 }
 

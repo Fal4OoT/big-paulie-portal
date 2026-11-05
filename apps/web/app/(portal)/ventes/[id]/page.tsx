@@ -11,7 +11,7 @@ import { Badge, Button, Card, ErrorBox, Input, Label, Modal, PageHeader, Spinner
 import { api } from "@/lib/api";
 import { cn, formatDateTime, formatMoney, formatPhone } from "@/lib/format";
 import { giftFor, PERM, useCan, usePortal, useStatus } from "@/lib/portal-context";
-import { STATUS_FLOW, type Client, type Sale, type SaleEvent, type StatusCode } from "@/lib/types";
+import { STATUS_FLOW, type Client, type Sale, type SaleEvent, type SalePartnerValidation, type StatusCode } from "@/lib/types";
 
 export default function SalePage() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +20,7 @@ export default function SalePage() {
   const status = useStatus();
   const [sale, setSale] = useState<Sale | null>(null);
   const [events, setEvents] = useState<SaleEvent[]>([]);
+  const [partnerValidations, setPartnerValidations] = useState<SalePartnerValidation[]>([]);
   const [client, setClient] = useState<Client | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,9 +31,10 @@ export default function SalePage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await api.get<{ sale: Sale; events: SaleEvent[] }>(`/api/sales/${id}`);
+      const res = await api.get<{ sale: Sale; events: SaleEvent[]; partnerValidations: SalePartnerValidation[] }>(`/api/sales/${id}`);
       setSale(res.sale);
       setEvents(res.events);
+      setPartnerValidations(res.partnerValidations ?? []);
       setPlate(res.sale.plate ?? "");
       if (can(PERM.clientsView)) setClient(await api.get<Client>(`/api/clients/${res.sale.clientId}`).catch(() => null));
     } catch (e) {
@@ -68,12 +70,15 @@ export default function SalePage() {
   const prev = !cancelled && rank > 0 ? STATUS_FLOW[rank - 1] : null;
   const type = config.vehicleTypes.find((t) => t.id === sale.vehicleTypeId);
   const gift = sale.status === "DELIVERED" ? null : giftFor(config, sale.price);
+  // Partenariats qui concernent ce véhicule (catégorie éligible).
+  const partners = config.partners.filter((p) => p.categoryIds.length === 0 || p.categoryIds.includes(sale.categoryId));
+  const deliveredMs = sale.deliveredAt ? new Date(sale.deliveredAt).getTime() : null;
   const permitField = type?.permitFieldKey ? config.clientFields.find((f) => f.key === type.permitFieldKey) : undefined;
 
   function advance() {
     if (!next) return;
     // La fenêtre de livraison s'ouvre s'il faut une plaque ou s'il y a un cadeau à remettre.
-    if (next === "DELIVERED" && (sale!.requiresPlate || gift)) {
+    if (next === "DELIVERED" && (sale!.requiresPlate || gift || partners.length > 0)) {
       setGiftChoice(null);
       setDeliverOpen(true);
     }
@@ -217,6 +222,34 @@ export default function SalePage() {
                 <span className="text-cream-dim">Aucun</span>
               )}
             </Info>
+            {partners.length > 0 && (
+              <Info label="Partenariat" wide>
+                <ul className="space-y-1">
+                  {partners.map((p) => {
+                    const v = partnerValidations.find((x) => x.partnerName === p.name);
+                    const until = deliveredMs ? deliveredMs + p.windowHours * 3_600_000 : null;
+                    return (
+                      <li key={p.id}>
+                        🔧 <strong>{p.name}</strong> · -{p.discountPercent} %{" "}
+                        {v ? (
+                          <span className="text-green-300">
+                            · customisation validée le {formatDateTime(v.validatedAt)}
+                            {v.validatedByName && <> par {v.validatedByName}</>}
+                            {v.amount != null && <> · {formatMoney(v.amount)}</>}
+                          </span>
+                        ) : until ? (
+                          <span className={until > Date.now() ? "text-amber-100" : "text-cream-dim"}>
+                            · {until > Date.now() ? `valable jusqu'au ${formatDateTime(new Date(until).toISOString())}` : "délai dépassé"}
+                          </span>
+                        ) : (
+                          <span className="text-cream-dim">· valable {p.windowHours} h après la livraison</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Info>
+            )}
             <Info label="Coupon">
               {sale.couponId ? (
                 <span>
@@ -290,6 +323,16 @@ export default function SalePage() {
                 Plaque
               </Label>
               <Input id="plate" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} maxLength={16} required autoFocus className="font-mono text-lg tracking-widest" />
+            </div>
+          )}
+          {partners.length > 0 && (
+            <div className="rounded-lg border border-paulie-green-bright/50 bg-paulie-green/15 px-4 py-3 text-sm">
+              {partners.map((p) => (
+                <div key={p.id}>
+                  🔧 <strong>À dire au client :</strong> -{p.discountPercent} % sur sa customisation chez <strong>{p.name}</strong> s'il s'y présente avec le
+                  véhicule dans les {p.windowHours} h.
+                </div>
+              ))}
             </div>
           )}
           {gift && (
