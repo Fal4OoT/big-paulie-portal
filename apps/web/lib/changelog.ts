@@ -18,6 +18,12 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.9.1",
+    date: "2026-11-05",
+    title: "Correctif",
+    changes: [{ kind: "correction", text: "Menu : « Partenaires » n'allume plus aussi « Espace partenaire »." }],
+  },
+  {
     version: "1.9.0",
     date: "2026-11-05",
     title: "Partenariat customisation et onglet Avantages clients",

@@ -85,7 +85,8 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
 
   const can = (p: string) => me.isAdmin || me.permissions.includes(p);
   const nav = NAV.filter((n) => can(n.perm));
-  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  // Actif sur l'adresse exacte ou ses sous-pages (« /partenaires » n'active pas « /partenaire »).
+  const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
   const topGrade = me.grades[0]?.name ?? (me.isAdmin ? "Administrateur" : "");
 
   async function logout() {

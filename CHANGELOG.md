@@ -3,6 +3,10 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.9.1 — 05/11/2026 · Correctif
+
+- **Correction** : menu : « Partenaires » n'allume plus aussi « Espace partenaire ».
+
 ## v1.9.0 — 05/11/2026 · Partenariat customisation et onglet Avantages clients
 
 - **Nouveau** : partenariats (Configuration → Avantages clients) : réduction pour le client qui se présente chez le partenaire avec son véhicule dans les X heures suivant la livraison, catégories concernées (terrestre par défaut), précisions client, contrat pour nos employés, salon Discord du partenaire (annonce des véhicules éligibles et des validations).
