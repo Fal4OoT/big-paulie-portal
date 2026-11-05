@@ -174,6 +174,40 @@ export interface PortalConfig {
   statuses: StatusSetting[];
   permissions: PermissionInfo[];
   referralEnabled: boolean;
+  giftsEnabled: boolean;
+  giftTiers: GiftTier[];
+}
+
+export interface GiftTier {
+  label: string;
+  min: number;
+  max: number | null;
+  choices: string[];
+}
+
+export interface TrainingSummary {
+  id: string;
+  title: string;
+  category: string | null;
+  published: boolean;
+  sortOrder: number;
+  updatedByName: string | null;
+  updatedAt: string;
+  excerpt: string;
+  searchText: string;
+}
+
+export interface TrainingSheet {
+  id: string;
+  title: string;
+  category: string | null;
+  content: string;
+  published: boolean;
+  sortOrder: number;
+  createdByName: string | null;
+  createdAt: string;
+  updatedByName: string | null;
+  updatedAt: string;
 }
 
 export interface Me {
@@ -228,6 +262,7 @@ export interface Sale {
   couponReference: string | null;
   couponPercent: number | null;
   couponReason: string | null;
+  gift: string | null;
   plate: string | null;
   status: StatusCode;
   permitWarning: boolean;
@@ -278,6 +313,8 @@ export interface PortalSettings {
   referralGodchildPercent: number;
   referralExpiryDays: number | null;
   referralMaxGodchildren: number | null;
+  giftsEnabled: boolean;
+  giftTiers: GiftTier[];
   statuses: StatusSetting[];
 }
 

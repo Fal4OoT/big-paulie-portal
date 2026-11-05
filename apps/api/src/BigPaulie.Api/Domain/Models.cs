@@ -69,6 +69,17 @@ public sealed class StatusSetting
     public string Color { get; set; } = "#888888";
 }
 
+public sealed class GiftTier
+{
+    public string Label { get; set; } = "";
+    /// <summary>Prix de vente minimum (inclus).</summary>
+    public decimal Min { get; set; }
+    /// <summary>Prix de vente maximum (inclus), null = sans limite.</summary>
+    public decimal? Max { get; set; }
+    /// <summary>Choix à faire à la remise (ex : Blanc, Rouge). Vide = pas de choix.</summary>
+    public List<string> Choices { get; set; } = new();
+}
+
 public sealed class PortalSettings
 {
     public string? LogChannelId { get; set; }
@@ -100,6 +111,18 @@ public sealed class PortalSettings
     public int? ReferralExpiryDays { get; set; } = 30;
     /// <summary>Nombre maximum de filleuls par parrain (null = illimité).</summary>
     public int? ReferralMaxGodchildren { get; set; } = 5;
+
+    /// <summary>Cadeau à remettre à la livraison selon le prix de vente.</summary>
+    public bool GiftsEnabled { get; set; }
+    public List<GiftTier> GiftTiers { get; set; } = new();
+
+    /// <summary>Palier de cadeau correspondant à un prix : celui au minimum le plus élevé atteint (un seul cadeau).</summary>
+    public GiftTier? GiftFor(decimal price) =>
+        !GiftsEnabled ? null
+        : GiftTiers.Select((t, i) => (t, i))
+                   .Where(x => price >= x.t.Min && (x.t.Max is null || price <= x.t.Max))
+                   .OrderByDescending(x => x.t.Min).ThenByDescending(x => x.i)
+                   .Select(x => x.t).FirstOrDefault();
     public List<StatusSetting> Statuses { get; set; } = new();
 
     public string StatusLabel(string code) =>
@@ -146,6 +169,7 @@ public sealed class SaleView
     public long? CouponNumber { get; set; }
     public int? CouponPercent { get; set; }
     public string? CouponReason { get; set; }
+    public string? Gift { get; set; }
     public string? Plate { get; set; }
     public string Status { get; set; } = "";
     public bool PermitWarning { get; set; }

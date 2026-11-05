@@ -3,6 +3,12 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.8.0 — 05/11/2026 · Formation et cadeaux à la livraison
+
+- **Nouveau** : onglet Formation : fiches classées par catégorie, avec recherche. Permissions « Voir les formations » (tous les grades) et « Créer / modifier les formations » (Patron par défaut). Éditeur avec aperçu en direct : titres, gras, listes, étapes numérotées, astuces, images collées avec Ctrl+V. Brouillons possibles.
+- **Nouveau** : cadeaux à la livraison (Configuration → Discord, tournée & statuts → Cadeaux à la livraison) : paliers selon le prix de vente, un seul cadeau (le palier au minimum le plus élevé l'emporte), choix facultatif (ex : Blanc / Rouge). Au passage en « Livré », le cadeau à remettre est signalé.
+- **Nouveau** : le cadeau remis est enregistré sur la vente, visible dans son historique et dans les logs Discord.
+
 ## v1.7.0 — 05/11/2026 · Parrain à la création du client
 
 - **Amélioration** : le parrain peut être choisi directement dans le formulaire « Nouveau client ». La fiche et le parrainage sont enregistrés ensemble : si le parrain est refusé (maximum de filleuls atteint…), rien n'est créé.

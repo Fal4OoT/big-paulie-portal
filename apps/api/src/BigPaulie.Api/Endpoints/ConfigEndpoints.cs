@@ -41,6 +41,8 @@ public static partial class ConfigEndpoints
         public int ReferralGodchildPercent { get; set; } = 10;
         public int? ReferralExpiryDays { get; set; } = 30;
         public int? ReferralMaxGodchildren { get; set; } = 5;
+        public bool GiftsEnabled { get; set; }
+        public List<GiftTier>? GiftTiers { get; set; }
         public List<StatusSetting>? Statuses { get; set; }
     }
 
@@ -70,6 +72,8 @@ public static partial class ConfigEndpoints
                 statuses = settings.Statuses,
                 permissions = Permissions.Catalog,
                 referralEnabled = settings.ReferralEnabled,
+                giftsEnabled = settings.GiftsEnabled,
+                giftTiers = settings.GiftTiers,
             });
         }).RequirePerm();
 
@@ -337,6 +341,26 @@ public static partial class ConfigEndpoints
             s.ReferralGodchildPercent = input.ReferralGodchildPercent;
             s.ReferralExpiryDays = input.ReferralExpiryDays;
             s.ReferralMaxGodchildren = input.ReferralMaxGodchildren;
+
+            if (input.GiftTiers is not null)
+            {
+                var tiers = new List<GiftTier>();
+                foreach (var t in input.GiftTiers)
+                {
+                    var label = t.Label?.Trim() ?? "";
+                    if (label.Length is 0 or > 60) return EndpointAuth.Bad("Cadeaux : chaque palier doit avoir un nom (60 caractères max).");
+                    if (t.Min < 0 || t.Max < 0) return EndpointAuth.Bad($"Cadeaux : montants invalides pour « {label} ».");
+                    if (t.Max is { } mx && mx < t.Min) return EndpointAuth.Bad($"Cadeaux : le maximum de « {label} » est inférieur à son minimum.");
+                    var choices = (t.Choices ?? new()).Select(ch => ch.Trim()).Where(ch => ch.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Take(10).ToList();
+                    tiers.Add(new GiftTier { Label = label, Min = Math.Round(t.Min, 2), Max = t.Max is { } m ? Math.Round(m, 2) : null, Choices = choices });
+                }
+                if (tiers.Count > 10) return EndpointAuth.Bad("Cadeaux : 10 paliers maximum.");
+                if (input.GiftsEnabled && tiers.Count == 0) return EndpointAuth.Bad("Cadeaux : ajoute au moins un palier.");
+                if (input.GiftsEnabled && tiers.GroupBy(t => t.Min).Any(gr => gr.Count() > 1))
+                    return EndpointAuth.Bad("Cadeaux : deux paliers ne peuvent pas avoir le même montant minimum.");
+                s.GiftTiers = tiers;
+            }
+            s.GiftsEnabled = input.GiftsEnabled;
 
             if (input.Statuses is not null)
             {

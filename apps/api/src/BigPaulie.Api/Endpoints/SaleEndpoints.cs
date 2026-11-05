@@ -34,6 +34,8 @@ public static class SaleEndpoints
         public string? To { get; set; }
         public string? Plate { get; set; }
         public string? Note { get; set; }
+        /// <summary>Choix du cadeau à la livraison (ex : Rouge), quand le palier en propose.</summary>
+        public string? GiftChoice { get; set; }
     }
 
     public sealed class BulkStatusInput
@@ -47,7 +49,7 @@ public static class SaleEndpoints
                trim(coalesce(c.data->>'prenom','') || ' ' || coalesce(c.data->>'nom','')) AS client_name,
                c.data->>'telephone' AS client_phone,
                s.vehicle_name, s.vehicle_type_id, vt.label AS vehicle_type_label, vc.label AS category_label, coalesce(vt.requires_plate, vc.requires_plate) AS requires_plate,
-               s.price, s.immediate, s.from_stock, s.coupon_id, cp.number AS coupon_number, cp.percent AS coupon_percent, cp.reason AS coupon_reason, s.plate, s.status, s.permit_warning, s.data::text AS data_json,
+               s.price, s.immediate, s.from_stock, s.coupon_id, cp.number AS coupon_number, cp.percent AS coupon_percent, cp.reason AS coupon_reason, s.gift, s.plate, s.status, s.permit_warning, s.data::text AS data_json,
                s.seller_id, u.display_name AS seller_name, s.created_at, s.updated_at, s.delivered_at
         FROM sales s
         JOIN clients c ON c.id = s.client_id
@@ -78,6 +80,7 @@ public static class SaleEndpoints
         couponReference = s.CouponNumber is { } cn ? CouponService.Ref(cn) : null,
         s.CouponPercent,
         s.CouponReason,
+        s.Gift,
         s.Plate,
         s.Status,
         s.PermitWarning,
@@ -305,7 +308,7 @@ public static class SaleEndpoints
             var me = http.Me();
             await using var c = await db.OpenConnectionAsync();
             var settings = await config.GetSettingsAsync();
-            var result = await ChangeStatusAsync(c, me, id, input.To, input.Plate, input.Note, settings);
+            var result = await ChangeStatusAsync(c, me, id, input.To, input.Plate, input.Note, settings, giftChoice: input.GiftChoice);
             if (result.Error is not null) return result.Error;
 
             var s = result.Sale!;
@@ -313,11 +316,12 @@ public static class SaleEndpoints
                 $"Vente {Ref(s.Number)} : {settings.StatusLabel(result.From!)} → {settings.StatusLabel(input.To!)}",
                 $"**{s.VehicleName}** ({s.VehicleTypeLabel}) pour **{s.ClientName}**" +
                 (input.To == SaleStatus.Delivered ? (result.Plate is null ? "\nSans plaque" : $"\nPlaque : **{result.Plate}**") : "") +
+                (result.Gift is null ? "" : $"\n🎁 Cadeau à remettre : **{result.Gift}**") +
                 (string.IsNullOrWhiteSpace(input.Note) ? "" : $"\nNote : {input.Note.Trim()}") +
                 (result.Notes is { Count: > 0 } n ? "\n" + string.Join("\n", n) : ""),
                 $"/ventes/{id}");
             http.RefreshTourBoard();
-            return Results.Ok(new { id, status = input.To });
+            return Results.Ok(new { id, status = input.To, gift = result.Gift });
         }).RequirePerm(Permissions.SalesView); // les droits précis sont vérifiés selon la transition
 
         // Actions groupées de la page Tournée (uniquement vers l'avant, sans livraison).
@@ -372,11 +376,11 @@ public static class SaleEndpoints
         return (name, null, null);
     }
 
-    public sealed record ChangeResult(IResult? Error, SaleView? Sale = null, string? From = null, string? Plate = null, List<string>? Notes = null);
+    public sealed record ChangeResult(IResult? Error, SaleView? Sale = null, string? From = null, string? Plate = null, List<string>? Notes = null, string? Gift = null);
 
     /// <summary>Change le statut d'une vente en vérifiant le droit correspondant à la transition.</summary>
     public static async Task<ChangeResult> ChangeStatusAsync(NpgsqlConnection c, CurrentUser me, Guid id, string? to,
-        string? plateInput, string? note, PortalSettings settings, bool forwardOnly = false)
+        string? plateInput, string? note, PortalSettings settings, bool forwardOnly = false, string? giftChoice = null)
     {
         if (!SaleStatus.IsValid(to)) return new(EndpointAuth.Bad("Statut inconnu."));
 
@@ -405,16 +409,29 @@ public static class SaleEndpoints
             if (plate is null) return new(EndpointAuth.Bad("La plaque est obligatoire pour passer la vente en livrée."));
         }
 
+        // Cadeau selon le prix de vente, figé au moment de la livraison.
+        string? gift = null;
+        if (to == SaleStatus.Delivered && settings.GiftFor(sale.Price) is { } tier)
+        {
+            gift = tier.Label;
+            if (tier.Choices.Count > 0)
+            {
+                var choice = tier.Choices.FirstOrDefault(ch => string.Equals(ch, giftChoice?.Trim(), StringComparison.OrdinalIgnoreCase));
+                if (choice is null) return new(EndpointAuth.Bad($"Cadeau : choisis {string.Join(" ou ", tier.Choices)} pour « {tier.Label} »."));
+                gift = $"{tier.Label} ({choice})";
+            }
+        }
+
         var action = to == SaleStatus.Cancelled ? "CANCELLED" : from == SaleStatus.Cancelled ? "RESTORED" : "STATUS";
         var notes = new List<string>();
         try
         {
             await using var tx = await c.BeginTransactionAsync();
             var updated = await c.ExecuteAsync("""
-                UPDATE sales SET status = @to, plate = @plate, updated_at = now(),
+                UPDATE sales SET status = @to, plate = @plate, updated_at = now(), gift = @gift,
                        delivered_at = CASE WHEN @to = 'DELIVERED' THEN now() WHEN @to <> 'CANCELLED' THEN NULL ELSE delivered_at END
                 WHERE id = @id AND status = @from
-                """, new { id, to, from, plate }, tx);
+                """, new { id, to, from, plate, gift }, tx);
             if (updated == 0)
             {
                 await tx.RollbackAsync();
@@ -423,7 +440,7 @@ public static class SaleEndpoints
             await c.ExecuteAsync("""
                 INSERT INTO sale_events (sale_id, action, from_status, to_status, note, actor_id)
                 VALUES (@id, @action, @from, @to, @note, @me)
-                """, new { id, action, from, to, note = Clean(note, 500), me = me.Id }, tx);
+                """, new { id, action, from, to, note = Clean(gift is null ? note : $"🎁 {gift}" + (string.IsNullOrWhiteSpace(note) ? "" : $" · {note}"), 500), me = me.Id }, tx);
 
             // Coupons : une vente annulée rend son coupon et retire le coupon de fidélité qu'elle avait généré.
             if (to == SaleStatus.Cancelled)
@@ -447,7 +464,8 @@ public static class SaleEndpoints
 
         sale.Status = to!;
         sale.Plate = plate;
-        return new(null, sale, from, plate, notes);
+        sale.Gift = gift;
+        return new(null, sale, from, plate, notes, gift);
     }
 
     private static string? Clean(string? s, int max)

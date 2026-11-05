@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { usePortal } from "@/lib/portal-context";
-import type { AdminConfig, PortalSettings } from "@/lib/types";
+import type { AdminConfig, GiftTier, PortalSettings } from "@/lib/types";
 import { Badge, Card, Input, Label, Select, Toggle } from "../ui";
 import { SaveBar, stableJson } from "./SaveBar";
 
@@ -265,6 +265,65 @@ export function SettingsEditor({ admin, onSaved }: { admin: AdminConfig; onSaved
               </p>
             </div>
           )}
+        </div>
+      </Card>
+
+      <Card title="Cadeaux à la livraison">
+        <Toggle checked={s.giftsEnabled} onChange={(v) => set({ giftsEnabled: v })} label="Signaler le cadeau à remettre au passage en « Livré »" />
+        <p className="mt-2 text-xs text-cream-dim">
+          Selon le prix de vente saisi. Un seul cadeau : si plusieurs paliers correspondent, celui au montant minimum le plus élevé l'emporte. Montants inclus.
+        </p>
+        <div className="mt-4 space-y-3">
+          {s.giftTiers.map((t, i) => {
+            const upd = (patch: Partial<GiftTier>) => set({ giftTiers: s.giftTiers.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+            return (
+              <div key={i} className="grid items-end gap-3 rounded-lg border border-night-500/70 bg-night-900/50 p-3 md:grid-cols-[1.4fr_1fr_1fr_1.2fr_auto]">
+                <div>
+                  <Label>Cadeau</Label>
+                  <Input value={t.label} maxLength={60} onChange={(e) => upd({ label: e.target.value })} />
+                </div>
+                <div>
+                  <Label>À partir de ($)</Label>
+                  <Input type="number" min={0} value={t.min} onChange={(e) => upd({ min: Math.max(0, Number(e.target.value) || 0) })} />
+                </div>
+                <div>
+                  <Label>Jusqu'à ($)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={t.max ?? ""}
+                    placeholder="sans limite"
+                    onChange={(e) => upd({ max: e.target.value === "" ? null : Math.max(0, Number(e.target.value) || 0) })}
+                  />
+                </div>
+                <div>
+                  <Label>Choix (séparés par des virgules)</Label>
+                  <Input
+                    value={t.choices.join(", ")}
+                    placeholder="ex : Blanc, Rouge"
+                    onChange={(e) => upd({ choices: e.target.value.split(",").map((x) => x.trimStart()) })}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="danger"
+                  onClick={() => set({ giftTiers: s.giftTiers.filter((_, j) => j !== i) })}
+                  title="Supprimer le palier"
+                >
+                  ×
+                </Button>
+              </div>
+            );
+          })}
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => set({ giftTiers: [...s.giftTiers, { label: "Nouveau cadeau", min: 0, max: null, choices: [] }] })}
+          >
+            + Ajouter un palier
+          </Button>
         </div>
       </Card>
 

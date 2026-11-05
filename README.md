@@ -35,6 +35,8 @@ Dépôt **autonome** : il ne dépend d'aucun autre projet (notamment pas du port
 - **Historique** de chaque vente : qui a fait quoi, à chaque étape, et quand.
 - **Tournées** toutes les 30 min (heure de Paris, xxh00 / xxh30) : un **tableau unique** dans le salon de tournée, mis à jour en direct, et republié à chaque tournée avec mention de rôle (notification). Une vente immédiate le republie aussitôt. **Retards** : au-delà de X tournées d'attente, le véhicule est marqué ⏰ et un grade est mentionné.
   Page Tournée avec cases à cocher et actions groupées.
+- **Formation** : fiches métier (Markdown simple, images collées), créées par le Patron.
+- **Cadeaux à la livraison** : paliers selon le prix de vente, signalés au passage en « Livré ».
 - **Logs** : toutes les actions sont enregistrées et publiées dans un salon Discord de logs.
 - **Bot** : `/client`, `/vente`, `/tournee` (réponses visibles par toi seul, droits selon tes rôles).
 

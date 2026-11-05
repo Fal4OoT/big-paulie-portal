@@ -18,6 +18,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.8.0",
+    date: "2026-11-05",
+    title: "Formation et cadeaux à la livraison",
+    changes: [
+      { kind: "nouveau", text: "Onglet Formation : fiches classées par catégorie, avec recherche. Les Patrons créent et modifient les fiches (titres, gras, listes, astuces, images collées avec Ctrl+V) avec un aperçu en direct, et peuvent les garder en brouillon." },
+      { kind: "nouveau", text: "Cadeaux à la livraison : paliers réglables selon le prix de vente (ex : bouteille de vin blanc ou rouge, bouteille de champagne). Au passage en « Livré », le cadeau à remettre est signalé et, s'il y a un choix, il est demandé." },
+      { kind: "nouveau", text: "Le cadeau remis est enregistré sur la vente, visible dans son historique et dans les logs Discord." },
+    ],
+  },
+  {
     version: "1.7.0",
     date: "2026-11-05",
     title: "Parrain à la création du client",

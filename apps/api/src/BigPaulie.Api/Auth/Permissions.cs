@@ -18,6 +18,8 @@ public static class Permissions
     public const string ReferralsManage = "referrals.manage";
     public const string TourView = "tour.view";
     public const string StatsView = "stats.view";
+    public const string TrainingView = "training.view";
+    public const string TrainingManage = "training.manage";
     public const string LogsView = "logs.view";
     public const string ConfigManage = "config.manage";
 
@@ -40,6 +42,8 @@ public static class Permissions
         new(ReferralsManage, "Enregistrer un parrainage", "Clients"),
         new(TourView, "Voir la tournée", "Logistique"),
         new(StatsView, "Voir l'analyse des ventes", "Logistique"),
+        new(TrainingView, "Voir les formations", "Formation"),
+        new(TrainingManage, "Créer / modifier les formations", "Formation"),
         new(LogsView, "Voir les logs", "Administration"),
         new(ConfigManage, "Configuration du portail", "Administration"),
     };

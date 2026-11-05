@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, ArrowRight, Ban, Check, Pencil, RotateCcw, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Ban, Check, Gift, Pencil, RotateCcw, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -10,7 +10,7 @@ import { ImmediateBadge, StatusBadge } from "@/components/StatusBadge";
 import { Badge, Button, Card, ErrorBox, Input, Label, Modal, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import { cn, formatDateTime, formatMoney, formatPhone } from "@/lib/format";
-import { PERM, useCan, usePortal, useStatus } from "@/lib/portal-context";
+import { giftFor, PERM, useCan, usePortal, useStatus } from "@/lib/portal-context";
 import { STATUS_FLOW, type Client, type Sale, type SaleEvent, type StatusCode } from "@/lib/types";
 
 export default function SalePage() {
@@ -26,6 +26,7 @@ export default function SalePage() {
   const [editOpen, setEditOpen] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
   const [plate, setPlate] = useState("");
+  const [giftChoice, setGiftChoice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -44,7 +45,7 @@ export default function SalePage() {
     void load();
   }, [load]);
 
-  async function changeStatus(to: StatusCode, extra?: { plate?: string; note?: string }) {
+  async function changeStatus(to: StatusCode, extra?: { plate?: string; note?: string; giftChoice?: string | null }) {
     setBusy(true);
     setError(null);
     try {
@@ -66,11 +67,16 @@ export default function SalePage() {
   const next = !cancelled && rank < STATUS_FLOW.length - 1 ? STATUS_FLOW[rank + 1] : null;
   const prev = !cancelled && rank > 0 ? STATUS_FLOW[rank - 1] : null;
   const type = config.vehicleTypes.find((t) => t.id === sale.vehicleTypeId);
+  const gift = sale.status === "DELIVERED" ? null : giftFor(config, sale.price);
   const permitField = type?.permitFieldKey ? config.clientFields.find((f) => f.key === type.permitFieldKey) : undefined;
 
   function advance() {
     if (!next) return;
-    if (next === "DELIVERED" && sale!.requiresPlate) setDeliverOpen(true);
+    // La fenêtre de livraison s'ouvre s'il faut une plaque ou s'il y a un cadeau à remettre.
+    if (next === "DELIVERED" && (sale!.requiresPlate || gift)) {
+      setGiftChoice(null);
+      setDeliverOpen(true);
+    }
     else void changeStatus(next);
   }
 
@@ -202,6 +208,15 @@ export default function SalePage() {
               )}
             </Info>
             <Info label="Vendeur">{sale.sellerName}</Info>
+            <Info label="Cadeau">
+              {sale.gift ? (
+                <span>🎁 {sale.gift}</span>
+              ) : gift ? (
+                <span className="text-amber-100">🎁 Prévu à la livraison : {gift.label}{gift.choices.length > 0 ? ` (${gift.choices.join(" / ")})` : ""}</span>
+              ) : (
+                <span className="text-cream-dim">Aucun</span>
+              )}
+            </Info>
             <Info label="Coupon">
               {sale.couponId ? (
                 <span>
@@ -258,19 +273,49 @@ export default function SalePage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            void changeStatus("DELIVERED", { plate });
+            if (gift && gift.choices.length > 0 && !giftChoice) {
+              setError(`Choisis le cadeau : ${gift.choices.join(" ou ")}.`);
+              return;
+            }
+            void changeStatus("DELIVERED", { plate: sale.requiresPlate ? plate : undefined, giftChoice });
           }}
           className="space-y-4"
         >
           <p className="text-sm text-cream-muted">
-            Renseigne la plaque du véhicule remis à <strong className="text-cream">{sale.clientName}</strong>.
+            Remise du véhicule à <strong className="text-cream">{sale.clientName}</strong>.
           </p>
-          <div>
-            <Label htmlFor="plate" required>
-              Plaque
-            </Label>
-            <Input id="plate" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} maxLength={16} required autoFocus className="font-mono text-lg tracking-widest" />
-          </div>
+          {sale.requiresPlate && (
+            <div>
+              <Label htmlFor="plate" required>
+                Plaque
+              </Label>
+              <Input id="plate" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} maxLength={16} required autoFocus className="font-mono text-lg tracking-widest" />
+            </div>
+          )}
+          {gift && (
+            <div className="rounded-lg border border-sand/60 bg-sand/10 px-4 py-3">
+              <div className="flex items-center gap-2 font-semibold text-amber-100">
+                <Gift className="h-5 w-5 text-sand" /> Cadeau à remettre : {gift.label}
+              </div>
+              {gift.choices.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {gift.choices.map((ch) => (
+                    <button
+                      key={ch}
+                      type="button"
+                      onClick={() => setGiftChoice(ch)}
+                      className={cn(
+                        "rounded-md border px-3 py-1.5 text-sm transition-colors",
+                        giftChoice === ch ? "border-sand bg-sand/25 text-cream" : "border-night-500 text-cream-muted hover:text-cream",
+                      )}
+                    >
+                      {ch}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <ErrorBox message={error} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setDeliverOpen(false)}>

@@ -75,7 +75,8 @@ public static class MiscEndpoints
         app.MapPost("/api/files", async (HttpRequest req, HttpContext http, NpgsqlDataSource db) =>
         {
             var me = http.Me();
-            if (!me.Has(Permissions.ClientsCreate) && !me.Has(Permissions.ClientsEdit) && !me.Has(Permissions.SalesEdit))
+            if (!me.Has(Permissions.ClientsCreate) && !me.Has(Permissions.ClientsEdit) && !me.Has(Permissions.SalesEdit)
+                && !me.Has(Permissions.TrainingManage))
                 return EndpointAuth.Forbidden();
             if (!req.HasFormContentType) return EndpointAuth.Bad("Envoi attendu en multipart/form-data.");
 
@@ -99,13 +100,15 @@ public static class MiscEndpoints
 
         app.MapGet("/api/files/{id:guid}", async (Guid id, NpgsqlDataSource db, HttpContext http) =>
         {
+            var me = http.Me();
+            if (!me.Has(Permissions.ClientsView) && !me.Has(Permissions.TrainingView)) return EndpointAuth.Forbidden();
             await using var c = await db.OpenConnectionAsync();
             var f = await c.QuerySingleOrDefaultAsync<FileRow>("SELECT content_type, data FROM files WHERE id = @id", new { id });
             if (f is null) return EndpointAuth.NotFound();
             http.Response.Headers.CacheControl = "private, max-age=86400";
             http.Response.Headers["X-Content-Type-Options"] = "nosniff";
             return Results.File(f.Data, f.ContentType);
-        }).RequirePerm(Permissions.ClientsView);
+        }).RequirePerm();
 
         // ---------- Logs ----------
         app.MapGet("/api/audit", async (NpgsqlDataSource db, string? q, long? before, int? limit) =>
