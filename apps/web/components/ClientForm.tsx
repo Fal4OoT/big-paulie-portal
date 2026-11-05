@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError } from "@/lib/api";
 import { formatDate, formatPhone } from "@/lib/format";
-import { usePortal } from "@/lib/portal-context";
-import type { DataRecord, Duplicate } from "@/lib/types";
+import { PERM, useCan, usePortal } from "@/lib/portal-context";
+import type { Client, DataRecord, Duplicate } from "@/lib/types";
+import { ClientSearch } from "./ClientSearch";
 import { DynamicFields } from "./DynamicFields";
-import { Button, ErrorBox } from "./ui";
+import { Button, ErrorBox, Label } from "./ui";
 
 /** Formulaire client (création ou modification) avec détection des doublons. */
 export function ClientForm({
@@ -23,7 +24,11 @@ export function ClientForm({
   onCancel?: () => void;
 }) {
   const { config } = usePortal();
+  const can = useCan();
   const [data, setData] = useState<DataRecord>(initial ?? {});
+  const [sponsor, setSponsor] = useState<Client | null>(null);
+  // Parrain choisi directement à la création de la fiche (le parrainage se fait avant le premier achat).
+  const showSponsor = !clientId && config.referralEnabled && can(PERM.referralsManage);
   const [dups, setDups] = useState<Duplicate[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +60,7 @@ export function ClientForm({
         await api.put(`/api/clients/${clientId}`, { data, force });
         onSaved(clientId);
       } else {
-        const res = await api.post<{ id: string }>("/api/clients", { data, force });
+        const res = await api.post<{ id: string }>("/api/clients", { data, force, sponsorId: showSponsor ? sponsor?.id ?? null : null });
         onSaved(res.id);
       }
     } catch (e) {
@@ -80,6 +85,14 @@ export function ClientForm({
   return (
     <form onSubmit={submit} className="space-y-6">
       <DynamicFields fields={config.clientFields} value={data} onChange={setData} />
+
+      {showSponsor && (
+        <div className="max-w-md">
+          <Label>Parrain (facultatif)</Label>
+          <ClientSearch value={sponsor} onSelect={setSponsor} placeholder="Rechercher le parrain parmi les clients…" />
+          <p className="mt-1 text-xs text-cream-dim">Le nouveau client recevra son coupon de parrainage, utilisable dès son premier achat.</p>
+        </div>
+      )}
 
       {dups.length > 0 && (
         <div className={`rounded-md border px-4 py-3 text-sm ${strong ? "border-paulie-red/60 bg-paulie-red/15" : "border-sand/50 bg-sand/10"}`}>

@@ -1,4 +1,5 @@
 using BigPaulie.Api.Auth;
+using BigPaulie.Api.Domain;
 using BigPaulie.Api.Infrastructure;
 using BigPaulie.Api.Services;
 using Dapper;
@@ -66,6 +67,70 @@ public static class ReferralEndpoints
         return CouponService.Ref(cp.Number);
     }
 
+    public sealed record AssignResult(IResult? Error, string? Label = null, string GodchildName = "", string SponsorName = "", string? ReplacedCoupon = null);
+
+    /// <summary>
+    /// Enregistre le parrain d'un client, dans la transaction de l'appelant (aussi utilisé à la création du client).
+    /// Crée le coupon du filleul. En cas d'erreur, l'appelant ne valide pas la transaction.
+    /// </summary>
+    public static async Task<AssignResult> AssignSponsorAsync(NpgsqlConnection c, NpgsqlTransaction tx, PortalSettings settings,
+        Guid id, Guid sponsorId, Guid actorId, DateOnly today)
+    {
+        if (!settings.ReferralEnabled) return new(EndpointAuth.Bad("Le parrainage n'est pas activé (Configuration → Coupons & fidélité)."));
+        if (sponsorId == id) return new(EndpointAuth.Bad("Un client ne peut pas être son propre parrain."));
+
+        var godchild = await c.QuerySingleOrDefaultAsync<(string DataJson, Guid? SponsorId)>(
+            "SELECT data::text, sponsor_id FROM clients WHERE id = @id AND deleted_at IS NULL FOR UPDATE", new { id }, tx);
+        if (godchild.DataJson is null) return new(EndpointAuth.NotFound("Client introuvable."));
+        var sponsorJson = await c.ExecuteScalarAsync<string?>(
+            "SELECT data::text FROM clients WHERE id = @sid AND deleted_at IS NULL", new { sid = sponsorId }, tx);
+        if (sponsorJson is null) return new(EndpointAuth.Bad("Le parrain doit être un client enregistré."));
+        if (godchild.SponsorId == sponsorId) return new(EndpointAuth.Bad("Ce client a déjà ce parrain."));
+
+        if (await c.ExecuteScalarAsync<int>(PurchasesSql, new { id }, tx) > 0)
+            return new(EndpointAuth.Bad("Le parrainage doit être enregistré avant le premier achat du filleul."));
+
+        // Aucun parrainage croisé, même en chaîne (A → B → C → A).
+        var cycle = await c.ExecuteScalarAsync<bool>("""
+            WITH RECURSIVE chain AS (
+                SELECT id, sponsor_id FROM clients WHERE id = @sid
+                UNION
+                SELECT cl.id, cl.sponsor_id FROM clients cl JOIN chain ON cl.id = chain.sponsor_id
+            )
+            SELECT EXISTS (SELECT 1 FROM chain WHERE id = @id)
+            """, new { sid = sponsorId, id }, tx);
+        if (cycle) return new(EndpointAuth.Bad("Parrainage croisé impossible : ce client fait déjà partie des parrains de ce parrain."));
+
+        if (settings.ReferralMaxGodchildren is { } max)
+        {
+            var count = await c.ExecuteScalarAsync<int>(
+                "SELECT count(*)::int FROM clients WHERE sponsor_id = @sid AND deleted_at IS NULL AND id <> @id", new { sid = sponsorId, id }, tx);
+            if (count >= max) return new(EndpointAuth.Bad($"Ce parrain a déjà {count} filleul(s), le maximum est {max}."));
+        }
+
+        string? replacedCoupon = null;
+        if (godchild.SponsorId is not null)
+        {
+            if (await LockReasonAsync(c, tx, id) is { } locked) return new(EndpointAuth.Conflict(locked));
+            replacedCoupon = await CancelGodchildCouponAsync(c, tx, id, actorId, "Parrain changé");
+        }
+
+        await c.ExecuteAsync("UPDATE clients SET sponsor_id = @sid, sponsor_set_at = now(), sponsor_set_by = @me WHERE id = @id",
+            new { sid = sponsorId, me = actorId == Guid.Empty ? (Guid?)null : actorId, id }, tx);
+
+        var sponsorName = CouponService.FullName(sponsorJson);
+        var label = await CouponService.CreateReferralCouponAsync(c, tx, settings, id, id, "GODCHILD", settings.ReferralGodchildPercent,
+            $"Parrainage : filleul de {sponsorName}", null, actorId, today);
+        return new(null, label, CouponService.FullName(godchild.DataJson), sponsorName, replacedCoupon);
+    }
+
+    public static Task LogAssignedAsync(AuditService audit, CurrentUser me, Guid id, AssignResult r) =>
+        audit.LogAsync(me, "referral.created", "client", id.ToString(), "Parrainage enregistré",
+            $"**{r.GodchildName}** est parrainé(e) par **{r.SponsorName}**.\n🏷️ Coupon filleul : **{r.Label}**" +
+            "\nLe parrain recevra son coupon au premier achat du filleul." +
+            (r.ReplacedCoupon is null ? "" : $"\nAncien coupon {r.ReplacedCoupon} annulé (parrain changé)."),
+            $"/clients/{id}");
+
     public static void MapReferrals(this WebApplication app)
     {
         app.MapGet("/api/clients/{id:guid}/referral", async (Guid id, NpgsqlDataSource db, ConfigService config) =>
@@ -123,63 +188,15 @@ public static class ReferralEndpoints
         {
             var me = http.Me();
             var settings = await config.GetSettingsAsync();
-            if (!settings.ReferralEnabled) return EndpointAuth.Bad("Le parrainage n'est pas activé (Configuration → Coupons & fidélité).");
-            if (input.SponsorId == id) return EndpointAuth.Bad("Un client ne peut pas être son propre parrain.");
-
             await using var c = await db.OpenConnectionAsync();
             await using var tx = await c.BeginTransactionAsync();
 
-            var godchild = await c.QuerySingleOrDefaultAsync<(string DataJson, Guid? SponsorId)>(
-                "SELECT data::text, sponsor_id FROM clients WHERE id = @id AND deleted_at IS NULL FOR UPDATE", new { id }, tx);
-            if (godchild.DataJson is null) return EndpointAuth.NotFound("Client introuvable.");
-            var sponsorJson = await c.ExecuteScalarAsync<string?>(
-                "SELECT data::text FROM clients WHERE id = @sid AND deleted_at IS NULL", new { sid = input.SponsorId }, tx);
-            if (sponsorJson is null) return EndpointAuth.Bad("Le parrain doit être un client enregistré.");
-            if (godchild.SponsorId == input.SponsorId) return EndpointAuth.Bad("Ce client a déjà ce parrain.");
-
-            if (await c.ExecuteScalarAsync<int>(PurchasesSql, new { id }, tx) > 0)
-                return EndpointAuth.Bad("Le parrainage doit être enregistré avant le premier achat du filleul.");
-
-            // Aucun parrainage croisé, même en chaîne (A → B → C → A).
-            var cycle = await c.ExecuteScalarAsync<bool>("""
-                WITH RECURSIVE chain AS (
-                    SELECT id, sponsor_id FROM clients WHERE id = @sid
-                    UNION
-                    SELECT cl.id, cl.sponsor_id FROM clients cl JOIN chain ON cl.id = chain.sponsor_id
-                )
-                SELECT EXISTS (SELECT 1 FROM chain WHERE id = @id)
-                """, new { sid = input.SponsorId, id }, tx);
-            if (cycle) return EndpointAuth.Bad("Parrainage croisé impossible : ce client fait déjà partie des parrains de ce parrain.");
-
-            if (settings.ReferralMaxGodchildren is { } max)
-            {
-                var count = await c.ExecuteScalarAsync<int>(
-                    "SELECT count(*)::int FROM clients WHERE sponsor_id = @sid AND deleted_at IS NULL AND id <> @id", new { sid = input.SponsorId, id }, tx);
-                if (count >= max) return EndpointAuth.Bad($"Ce parrain a déjà {count} filleul(s), le maximum est {max}.");
-            }
-
-            string? replacedCoupon = null;
-            if (godchild.SponsorId is not null)
-            {
-                if (await LockReasonAsync(c, tx, id) is { } locked) return EndpointAuth.Conflict(locked);
-                replacedCoupon = await CancelGodchildCouponAsync(c, tx, id, me.Id, "Parrain changé");
-            }
-
-            await c.ExecuteAsync("UPDATE clients SET sponsor_id = @sid, sponsor_set_at = now(), sponsor_set_by = @me WHERE id = @id",
-                new { sid = input.SponsorId, me = me.Id == Guid.Empty ? (Guid?)null : me.Id, id }, tx);
-
-            var godchildName = CouponService.FullName(godchild.DataJson);
-            var sponsorName = CouponService.FullName(sponsorJson);
-            var label = await CouponService.CreateReferralCouponAsync(c, tx, settings, id, id, "GODCHILD", settings.ReferralGodchildPercent,
-                $"Parrainage : filleul de {sponsorName}", null, me.Id, CouponService.Today(opt));
+            var r = await AssignSponsorAsync(c, tx, settings, id, input.SponsorId, me.Id, CouponService.Today(opt));
+            if (r.Error is not null) return r.Error; // la transaction est annulée
             await tx.CommitAsync();
 
-            await audit.LogAsync(me, "referral.created", "client", id.ToString(), "Parrainage enregistré",
-                $"**{godchildName}** est parrainé(e) par **{sponsorName}**.\n🏷️ Coupon filleul : **{label}**" +
-                $"\nLe parrain recevra son coupon au premier achat du filleul." +
-                (replacedCoupon is null ? "" : $"\nAncien coupon {replacedCoupon} annulé (parrain changé)."),
-                $"/clients/{id}");
-            return Results.Ok(new { ok = true, coupon = label });
+            await LogAssignedAsync(audit, me, id, r);
+            return Results.Ok(new { ok = true, coupon = r.Label });
         }).RequirePerm(Permissions.ReferralsManage);
 
         app.MapDelete("/api/clients/{id:guid}/sponsor", async (Guid id, HttpContext http, NpgsqlDataSource db, AuditService audit) =>

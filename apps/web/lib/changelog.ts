@@ -18,6 +18,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.7.0",
+    date: "2026-11-05",
+    title: "Parrain à la création du client",
+    changes: [
+      { kind: "amélioration", text: "Le parrain peut être choisi directement dans le formulaire « Nouveau client ». La fiche et le parrainage sont enregistrés ensemble : si le parrain est refusé, rien n'est créé." },
+    ],
+  },
+  {
     version: "1.6.0",
     date: "2026-11-05",
     title: "Parrainage",

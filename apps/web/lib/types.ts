@@ -173,6 +173,7 @@ export interface PortalConfig {
   vehicleTypes: VehicleType[];
   statuses: StatusSetting[];
   permissions: PermissionInfo[];
+  referralEnabled: boolean;
 }
 
 export interface Me {

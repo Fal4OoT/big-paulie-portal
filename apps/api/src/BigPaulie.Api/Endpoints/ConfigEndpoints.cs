@@ -69,6 +69,7 @@ public static partial class ConfigEndpoints
                 vehicleTypes = await config.GetVehicleTypesAsync(),
                 statuses = settings.Statuses,
                 permissions = Permissions.Catalog,
+                referralEnabled = settings.ReferralEnabled,
             });
         }).RequirePerm();
 

@@ -14,6 +14,8 @@ public static class ClientEndpoints
         public JsonObject? Data { get; set; }
         /// <summary>Confirme la création malgré un doublon potentiel.</summary>
         public bool Force { get; set; }
+        /// <summary>Parrain choisi à la création (facultatif).</summary>
+        public Guid? SponsorId { get; set; }
     }
 
     private sealed class ClientRow
@@ -101,9 +103,12 @@ public static class ClientEndpoints
             return Results.Ok(await FindDuplicatesAsync(c, input.Data ?? new JsonObject(), excludeId));
         }).RequirePerm(Permissions.ClientsView);
 
-        g.MapPost("/", async (ClientInput input, HttpContext http, NpgsqlDataSource db, ConfigService config, AuditService audit) =>
+        g.MapPost("/", async (ClientInput input, HttpContext http, NpgsqlDataSource db, ConfigService config, AuditService audit,
+            BigPaulie.Api.Infrastructure.PortalOptions opt) =>
         {
             var me = http.Me();
+            if (input.SponsorId is not null && !me.Has(Permissions.ReferralsManage))
+                return EndpointAuth.Forbidden("Ton grade ne permet pas d'enregistrer un parrainage.");
             var fields = await config.GetFieldsAsync("client");
             await using var c = await db.OpenConnectionAsync();
 
@@ -116,13 +121,24 @@ public static class ClientEndpoints
                 if (dups.Count > 0) return EndpointAuth.Conflict("Un client similaire existe déjà.", dups);
             }
 
+            // Fiche et parrainage dans la même transaction : si le parrain est refusé, rien n'est créé.
+            await using var tx = await c.BeginTransactionAsync();
             var id = await c.ExecuteScalarAsync<Guid>("""
                 INSERT INTO clients (data, search_text, created_by, updated_by)
                 VALUES (@data::jsonb, @search, @me, @me) RETURNING id
-                """, new { data = v.Data.ToJsonString(), search = FieldValidator.BuildSearchText(fields, v.Data), me = me.Id });
+                """, new { data = v.Data.ToJsonString(), search = FieldValidator.BuildSearchText(fields, v.Data), me = me.Id }, tx);
+
+            ReferralEndpoints.AssignResult? referral = null;
+            if (input.SponsorId is { } sponsorId)
+            {
+                referral = await ReferralEndpoints.AssignSponsorAsync(c, tx, await config.GetSettingsAsync(), id, sponsorId, me.Id, CouponService.Today(opt));
+                if (referral.Error is not null) return referral.Error; // la transaction est annulée
+            }
+            await tx.CommitAsync();
 
             await audit.LogAsync(me, "client.created", "client", id.ToString(), "Nouveau client",
                 $"**{FullName(v.Data)}** a été ajouté.", $"/clients/{id}");
+            if (referral is not null) await ReferralEndpoints.LogAssignedAsync(audit, me, id, referral);
             return Results.Ok(new { id });
         }).RequirePerm(Permissions.ClientsCreate);
 
