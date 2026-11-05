@@ -18,6 +18,12 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.8.1",
+    date: "2026-11-05",
+    title: "Correctif",
+    changes: [{ kind: "correction", text: "Correction de la mise en ligne de la v1.8.0 (réglages des cadeaux)." }],
+  },
+  {
     version: "1.8.0",
     date: "2026-11-05",
     title: "Formation et cadeaux à la livraison",

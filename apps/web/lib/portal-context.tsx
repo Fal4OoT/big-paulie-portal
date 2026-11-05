@@ -32,11 +32,13 @@ export function useStatus() {
 /** Palier de cadeau pour un prix : celui au minimum le plus élevé atteint (même règle que l'API). */
 export function giftFor(config: PortalConfig, price: number): GiftTier | null {
   if (!config.giftsEnabled) return null;
-  let best: { t: GiftTier; i: number } | null = null;
-  config.giftTiers.forEach((t, i) => {
-    if (price >= t.min && (t.max == null || price <= t.max) && (!best || t.min > best.t.min || (t.min === best.t.min && i > best.i))) best = { t, i };
-  });
-  return best ? (best as { t: GiftTier; i: number }).t : null;
+  let best: GiftTier | null = null;
+  for (const t of config.giftTiers) {
+    const matches = price >= t.min && (t.max == null || price <= t.max);
+    // À minimum égal, le dernier palier de la liste l'emporte (comme côté API).
+    if (matches && (best === null || t.min >= best.min)) best = t;
+  }
+  return best;
 }
 
 export const PERM = {

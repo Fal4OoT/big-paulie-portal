@@ -3,6 +3,10 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.8.1 — 05/11/2026 · Correctif
+
+- **Correction** : la v1.8.0 ne se construisait pas (import manquant dans les réglages des cadeaux).
+
 ## v1.8.0 — 05/11/2026 · Formation et cadeaux à la livraison
 
 - **Nouveau** : onglet Formation : fiches classées par catégorie, avec recherche. Permissions « Voir les formations » (tous les grades) et « Créer / modifier les formations » (Patron par défaut). Éditeur avec aperçu en direct : titres, gras, listes, étapes numérotées, astuces, images collées avec Ctrl+V. Brouillons possibles.

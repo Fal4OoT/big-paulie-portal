@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { usePortal } from "@/lib/portal-context";
 import type { AdminConfig, GiftTier, PortalSettings } from "@/lib/types";
-import { Badge, Card, Input, Label, Select, Toggle } from "../ui";
+import { Badge, Button, Card, Input, Label, Select, Toggle } from "../ui";
 import { SaveBar, stableJson } from "./SaveBar";
 
 export function SettingsEditor({ admin, onSaved }: { admin: AdminConfig; onSaved: () => Promise<void> }) {
