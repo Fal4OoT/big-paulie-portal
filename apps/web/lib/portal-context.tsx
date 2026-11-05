@@ -40,6 +40,8 @@ export const PERM = {
   salesRevert: "sales.revert",
   salesEdit: "sales.edit",
   salesCancel: "sales.cancel",
+  couponsCreate: "coupons.create",
+  couponsCancel: "coupons.cancel",
   tourView: "tour.view",
   statsView: "stats.view",
   logsView: "logs.view",

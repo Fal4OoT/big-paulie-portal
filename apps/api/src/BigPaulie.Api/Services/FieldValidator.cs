@@ -89,12 +89,28 @@ public static class FieldValidator
                 default: // text, textarea
                     var max = f.Type == "textarea" ? 4000 : 200;
                     if (str!.Length > max) errors.Add($"« {f.Label} » : {max} caractères maximum.");
-                    else output[f.Key] = str;
+                    else output[f.Key] = f.Entity == "client" && f.Key is "prenom" or "nom" ? CapitalizeParts(str) : str;
                     break;
             }
         }
 
         return new Result(output, errors);
+    }
+
+    /// <summary>
+    /// Première lettre de chaque partie en majuscule (après une espace, un tiret ou une apostrophe),
+    /// le reste est laissé tel quel : « jean-pierre de la fuente » → « Jean-Pierre De La Fuente », « McDonald » inchangé.
+    /// </summary>
+    public static string CapitalizeParts(string s)
+    {
+        var chars = s.ToCharArray();
+        var prev = ' ';
+        for (var i = 0; i < chars.Length; i++)
+        {
+            if (prev is ' ' or '-' or '\'' or '’') chars[i] = char.ToUpper(chars[i], CultureInfo.GetCultureInfo("fr-FR"));
+            prev = chars[i];
+        }
+        return new string(chars);
     }
 
     public static JsonObject ParseObject(string? json)

@@ -38,6 +38,36 @@ export interface VehicleType {
   requiresPlate: boolean | null;
 }
 
+export type CouponStatus = "AVAILABLE" | "USED" | "EXPIRED" | "CANCELLED";
+
+export interface Coupon {
+  id: string;
+  reference: string;
+  percent: number;
+  reason: string;
+  expiresOn: string | null;
+  source: "MANUAL" | "LOYALTY";
+  sourceSaleId: string | null;
+  sourceSaleReference: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  usedSaleId: string | null;
+  usedSaleReference: string | null;
+  usedByName: string | null;
+  usedAt: string | null;
+  cancelledByName: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  status: CouponStatus;
+  events: { action: string; saleReference: string | null; note: string | null; actorName: string | null; at: string }[];
+}
+
+export interface ClientCoupons {
+  coupons: Coupon[];
+  loyalty: { enabled: boolean; every: number; percent: number; expiryDays: number | null; purchases: number; progress: number };
+  maxPercent: number;
+}
+
 export interface CatalogVehicle {
   id: string;
   name: string;
@@ -179,6 +209,10 @@ export interface Sale {
   immediate: boolean;
   /** Vendu depuis le stock : la vente a démarré en « Réceptionné ». */
   fromStock: boolean;
+  couponId: string | null;
+  couponReference: string | null;
+  couponPercent: number | null;
+  couponReason: string | null;
   plate: string | null;
   status: StatusCode;
   permitWarning: boolean;
@@ -219,6 +253,11 @@ export interface PortalSettings {
   tourSkipEmpty: boolean;
   tourLateAfter: number;
   tourLateRoleId: string | null;
+  couponMaxPercent: number;
+  loyaltyEnabled: boolean;
+  loyaltyEvery: number;
+  loyaltyPercent: number;
+  loyaltyExpiryDays: number | null;
   statuses: StatusSetting[];
 }
 

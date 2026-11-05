@@ -3,6 +3,14 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.5.0 — 05/11/2026 · Coupons de promotion et fidélité
+
+- **Nouveau** : coupons de promotion sur la fiche client : pourcentage (20 % maximum, réglable), raison et date d'expiration facultative. Attribution et annulation selon le grade (permissions « Attribuer / Annuler un coupon », Patron et Chef de service par défaut).
+- **Nouveau** : choix du coupon dans « Nouvel achat » (un seul par achat, non cumulable). Le coupon est marqué utilisé par qui, quand et sur quel achat ; le prix reste celui saisi.
+- **Nouveau** : programme de fidélité réglable (Configuration → Discord, tournée & statuts → Coupons & fidélité) : tous les X achats, un coupon de X % est ajouté au client. Toute vente non annulée compte, achats passés compris (sans génération rétroactive).
+- **Amélioration** : une vente annulée rend son coupon et retire le coupon de fidélité qu'elle avait généré s'il n'a pas servi ; il est rétabli si la vente l'est.
+- **Amélioration** : prénom et nom : la première lettre de chaque partie est mise en majuscule (« jean-pierre de la fuente » → « Jean-Pierre De La Fuente »), clients existants compris.
+
 ## v1.4.0 — 04/11/2026 · Catalogue des véhicules et analyse
 
 - **Nouveau** : catalogue des véhicules importé depuis le panel légal (Configuration → Catalogue) par copier-coller de la réponse du panel, avec aperçu des changements avant import. Seuls les noms et catégories des véhicules sont lus.

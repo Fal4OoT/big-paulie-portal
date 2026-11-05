@@ -131,6 +131,74 @@ export function SettingsEditor({ admin, onSaved }: { admin: AdminConfig; onSaved
         </p>
       </Card>
 
+      <Card title="Coupons & fidélité">
+        <div className="space-y-5">
+          <div>
+            <Label>Promotion maximum d'un coupon</Label>
+            <div className="flex items-center gap-3">
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={s.couponMaxPercent}
+                onChange={(e) => set({ couponMaxPercent: Math.max(1, Math.min(100, Number(e.target.value) || 1)) })}
+                className="w-24"
+              />
+              <span className="text-sm text-cream-muted">%</span>
+            </div>
+            <p className="mt-1 text-xs text-cream-dim">
+              Qui peut attribuer ou annuler un coupon se règle dans Grades & permissions.
+            </p>
+          </div>
+
+          <Toggle checked={s.loyaltyEnabled} onChange={(v) => set({ loyaltyEnabled: v })} label="Programme de fidélité" />
+          {s.loyaltyEnabled && (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <Label>Un coupon tous les</Label>
+                <div className="flex items-center gap-2">
+                  <Input type="number" min={1} max={100} value={s.loyaltyEvery} onChange={(e) => set({ loyaltyEvery: Math.max(1, Number(e.target.value) || 1) })} className="w-24" />
+                  <span className="text-sm text-cream-muted">achats</span>
+                </div>
+              </div>
+              <div>
+                <Label>Promotion</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={s.couponMaxPercent}
+                    value={s.loyaltyPercent}
+                    onChange={(e) => set({ loyaltyPercent: Math.max(1, Number(e.target.value) || 1) })}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-cream-muted">%</span>
+                </div>
+              </div>
+              <div>
+                <Label>Valable</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={s.loyaltyExpiryDays ?? ""}
+                    placeholder="∞"
+                    onChange={(e) => set({ loyaltyExpiryDays: e.target.value === "" ? null : Math.max(1, Number(e.target.value) || 1) })}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-cream-muted">jours (vide = sans expiration)</span>
+                </div>
+              </div>
+              <p className="text-xs text-cream-dim sm:col-span-3">
+                Toute vente non annulée compte, dès sa création. Exemple : tous les {s.loyaltyEvery} achats, le client reçoit un coupon de{" "}
+                {s.loyaltyPercent} % dans sa liste. Si la vente qui l'a généré est annulée, le coupon est retiré tant qu'il n'a pas servi.
+              </p>
+            </div>
+          )}
+        </div>
+      </Card>
+
       <Card title="Statuts des ventes">
         <p className="mb-4 text-sm text-cream-muted">
           Le circuit est fixe (la tournée et la livraison en dépendent), mais les libellés et couleurs sont libres.

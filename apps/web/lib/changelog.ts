@@ -18,6 +18,18 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.5.0",
+    date: "2026-11-05",
+    title: "Coupons de promotion et fidélité",
+    changes: [
+      { kind: "nouveau", text: "Coupons de promotion sur la fiche client : pourcentage (20 % maximum, réglable), raison et date d'expiration facultative. Attribution et annulation selon le grade (Patron et Chef de service par défaut)." },
+      { kind: "nouveau", text: "Choix du coupon dans « Nouvel achat » (un seul par achat, non cumulable) : il est marqué utilisé par qui, quand et sur quel achat. Le prix reste celui saisi." },
+      { kind: "nouveau", text: "Programme de fidélité réglable : tous les X achats, un coupon de X % est ajouté au client. Les achats passés comptent dans la progression." },
+      { kind: "amélioration", text: "Une vente annulée rend son coupon et retire le coupon de fidélité qu'elle avait généré s'il n'a pas servi." },
+      { kind: "amélioration", text: "Prénom et nom : la première lettre de chaque partie est mise en majuscule (« jean-pierre » → « Jean-Pierre »), clients existants compris." },
+    ],
+  },
+  {
     version: "1.4.0",
     date: "2026-11-04",
     title: "Catalogue des véhicules et analyse",

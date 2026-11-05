@@ -23,6 +23,8 @@ public static class SaleEndpoints
         public bool Immediate { get; set; }
         /// <summary>Véhicule déjà en stock : la vente démarre en « Réceptionné · à livrer » (création uniquement).</summary>
         public bool InStock { get; set; }
+        /// <summary>Coupon utilisé sur cet achat (un seul, non cumulable). En modification : valeur souhaitée.</summary>
+        public Guid? CouponId { get; set; }
         public string? Plate { get; set; }
         public JsonObject? Data { get; set; }
     }
@@ -45,13 +47,14 @@ public static class SaleEndpoints
                trim(coalesce(c.data->>'prenom','') || ' ' || coalesce(c.data->>'nom','')) AS client_name,
                c.data->>'telephone' AS client_phone,
                s.vehicle_name, s.vehicle_type_id, vt.label AS vehicle_type_label, vc.label AS category_label, coalesce(vt.requires_plate, vc.requires_plate) AS requires_plate,
-               s.price, s.immediate, s.from_stock, s.plate, s.status, s.permit_warning, s.data::text AS data_json,
+               s.price, s.immediate, s.from_stock, s.coupon_id, cp.number AS coupon_number, cp.percent AS coupon_percent, cp.reason AS coupon_reason, s.plate, s.status, s.permit_warning, s.data::text AS data_json,
                s.seller_id, u.display_name AS seller_name, s.created_at, s.updated_at, s.delivered_at
         FROM sales s
         JOIN clients c ON c.id = s.client_id
         JOIN vehicle_types vt ON vt.id = s.vehicle_type_id
         JOIN vehicle_categories vc ON vc.id = vt.category_id
         JOIN users u ON u.id = s.seller_id
+        LEFT JOIN coupons cp ON cp.id = s.coupon_id
         """;
 
     public static object ToDto(SaleView s) => new
@@ -71,6 +74,10 @@ public static class SaleEndpoints
         s.Price,
         s.Immediate,
         s.FromStock,
+        s.CouponId,
+        couponReference = s.CouponNumber is { } cn ? CouponService.Ref(cn) : null,
+        s.CouponPercent,
+        s.CouponReason,
         s.Plate,
         s.Status,
         s.PermitWarning,
@@ -131,7 +138,7 @@ public static class SaleEndpoints
         }).RequirePerm(Permissions.SalesView);
 
         g.MapPost("/", async (SaleInput input, HttpContext http, NpgsqlDataSource db, ConfigService config,
-            AuditService audit) =>
+            AuditService audit, PortalOptions opt) =>
         {
             var me = http.Me();
             await using var c = await db.OpenConnectionAsync();
@@ -170,6 +177,17 @@ public static class SaleEndpoints
                 INSERT INTO sale_events (sale_id, action, to_status, note, actor_id)
                 VALUES (@id, 'CREATED', @status, @note, @me)
                 """, new { id = created.Id, status, note, me = me.Id }, tx);
+
+            var today = CouponService.Today(opt);
+            string? couponLabel = null;
+            if (input.CouponId is { } couponId)
+            {
+                var (couponError, label) = await CouponService.ApplyAsync(c, tx, couponId, created.Id, input.ClientId, me.Id, today);
+                if (couponError is not null) return EndpointAuth.Bad(couponError); // la transaction est annulée
+                couponLabel = label;
+            }
+            var settingsForLoyalty = await config.GetSettingsAsync();
+            var loyaltyLabel = await CouponService.LoyaltyOnSaleCreatedAsync(c, tx, settingsForLoyalty, input.ClientId, created.Id, me.Id, today);
             await tx.CommitAsync();
 
             var reference = Ref(created.Number);
@@ -180,18 +198,22 @@ public static class SaleEndpoints
             await audit.LogAsync(me, "sale.created", "sale", created.Id.ToString(), $"Nouvelle vente {reference}",
                 $"**{name}** ({type.Label} · {categoryLabel}) pour **{clientName}** — {Money(input.Price.Value)}" +
                 (inStock ? "\n📦 **En stock** : directement à livrer" : immediate ? "\n⚡ **Immédiat**" : "\n🕒 Prochaine tournée") +
-                (warning ? "\n⚠️ Permis correspondant non renseigné" : ""),
+                (warning ? "\n⚠️ Permis correspondant non renseigné" : "") +
+                (couponLabel is null ? "" : $"\n🏷️ Coupon utilisé : **{couponLabel}**"),
                 $"/ventes/{created.Id}");
+            if (loyaltyLabel is not null)
+                await audit.LogAsync(me, "coupon.created", "client", input.ClientId.ToString(), "Coupon de fidélité généré",
+                    $"**{loyaltyLabel}** pour **{clientName}** grâce à la vente {reference}.", $"/clients/{input.ClientId}");
 
             // Vente immédiate : le tableau de tournée est reposté avec mention du rôle « immédiat ».
             var board = http.RequestServices.GetRequiredService<TourBoardService>();
             if (immediate) board.RequestRepost(TourBoardService.RepostReason.Immediate, $"{reference} · {name} ({type.Label}) pour {clientName}");
             else board.RequestRefresh();
 
-            return Results.Ok(new { id = created.Id, number = created.Number, reference, status, permitWarning = warning });
+            return Results.Ok(new { id = created.Id, number = created.Number, reference, status, permitWarning = warning, loyaltyCoupon = loyaltyLabel });
         }).RequirePerm(Permissions.SalesCreate);
 
-        g.MapPut("/{id:guid}", async (Guid id, SaleInput input, HttpContext http, NpgsqlDataSource db, ConfigService config, AuditService audit) =>
+        g.MapPut("/{id:guid}", async (Guid id, SaleInput input, HttpContext http, NpgsqlDataSource db, ConfigService config, AuditService audit, PortalOptions opt) =>
         {
             var me = http.Me();
             await using var c = await db.OpenConnectionAsync();
@@ -233,7 +255,10 @@ public static class SaleEndpoints
             if (sale.Immediate != input.Immediate) changes.Add(input.Immediate ? "passée en immédiat" : "n'est plus immédiate");
             if (sale.Plate != plate) changes.Add($"plaque : {sale.Plate ?? "—"} → {plate}");
             if (FieldValidator.ParseObject(sale.DataJson).ToJsonString() != v.Data.ToJsonString()) changes.Add("informations complémentaires");
-            if (changes.Count == 0) return Results.Ok(new { id });
+            var couponChanged = input.CouponId != sale.CouponId;
+            if (couponChanged && input.CouponId is not null && sale.Status == SaleStatus.Cancelled)
+                return EndpointAuth.Bad("Impossible d'utiliser un coupon sur une vente annulée.");
+            if (changes.Count == 0 && !couponChanged) return Results.Ok(new { id });
 
             try
             {
@@ -243,6 +268,17 @@ public static class SaleEndpoints
                                      plate = @plate, permit_warning = @warning, data = @data::jsonb, updated_at = now()
                     WHERE id = @id
                     """, new { id, catalogId, name, typeId = type.Id, price = Math.Round(input.Price.Value, 2), immediate = input.Immediate, plate, warning, data = v.Data.ToJsonString() }, tx);
+                if (couponChanged)
+                {
+                    var released = await CouponService.ReleaseAsync(c, tx, id, me.Id, $"Retiré de la vente {Ref(sale.Number)}");
+                    if (released is not null) changes.Add($"coupon {released} retiré");
+                    if (input.CouponId is { } newCoupon)
+                    {
+                        var (couponError, label) = await CouponService.ApplyAsync(c, tx, newCoupon, id, sale.ClientId, me.Id, CouponService.Today(opt));
+                        if (couponError is not null) return EndpointAuth.Bad(couponError); // la transaction est annulée
+                        changes.Add($"coupon {label} utilisé");
+                    }
+                }
                 await c.ExecuteAsync("INSERT INTO sale_events (sale_id, action, note, actor_id) VALUES (@id, 'EDITED', @note, @me)",
                     new { id, note = string.Join(" · ", changes), me = me.Id }, tx);
                 await tx.CommitAsync();
@@ -272,7 +308,8 @@ public static class SaleEndpoints
                 $"Vente {Ref(s.Number)} : {settings.StatusLabel(result.From!)} → {settings.StatusLabel(input.To!)}",
                 $"**{s.VehicleName}** ({s.VehicleTypeLabel}) pour **{s.ClientName}**" +
                 (input.To == SaleStatus.Delivered ? (result.Plate is null ? "\nSans plaque" : $"\nPlaque : **{result.Plate}**") : "") +
-                (string.IsNullOrWhiteSpace(input.Note) ? "" : $"\nNote : {input.Note.Trim()}"),
+                (string.IsNullOrWhiteSpace(input.Note) ? "" : $"\nNote : {input.Note.Trim()}") +
+                (result.Notes is { Count: > 0 } n ? "\n" + string.Join("\n", n) : ""),
                 $"/ventes/{id}");
             http.RefreshTourBoard();
             return Results.Ok(new { id, status = input.To });
@@ -330,7 +367,7 @@ public static class SaleEndpoints
         return (name, null, null);
     }
 
-    public sealed record ChangeResult(IResult? Error, SaleView? Sale = null, string? From = null, string? Plate = null);
+    public sealed record ChangeResult(IResult? Error, SaleView? Sale = null, string? From = null, string? Plate = null, List<string>? Notes = null);
 
     /// <summary>Change le statut d'une vente en vérifiant le droit correspondant à la transition.</summary>
     public static async Task<ChangeResult> ChangeStatusAsync(NpgsqlConnection c, CurrentUser me, Guid id, string? to,
@@ -364,6 +401,7 @@ public static class SaleEndpoints
         }
 
         var action = to == SaleStatus.Cancelled ? "CANCELLED" : from == SaleStatus.Cancelled ? "RESTORED" : "STATUS";
+        var notes = new List<string>();
         try
         {
             await using var tx = await c.BeginTransactionAsync();
@@ -381,6 +419,19 @@ public static class SaleEndpoints
                 INSERT INTO sale_events (sale_id, action, from_status, to_status, note, actor_id)
                 VALUES (@id, @action, @from, @to, @note, @me)
                 """, new { id, action, from, to, note = Clean(note, 500), me = me.Id }, tx);
+
+            // Coupons : une vente annulée rend son coupon et retire le coupon de fidélité qu'elle avait généré.
+            if (to == SaleStatus.Cancelled)
+            {
+                if (await CouponService.ReleaseAsync(c, tx, id, me.Id, $"Vente {Ref(sale.Number)} annulée") is { } released)
+                    notes.Add($"🏷️ Coupon {released} de nouveau disponible");
+                if (await CouponService.LoyaltyOnSaleCancelledAsync(c, tx, id, me.Id) is { } loyalty)
+                    notes.Add($"🏷️ Coupon de fidélité {loyalty} annulé");
+            }
+            else if (from == SaleStatus.Cancelled && await CouponService.LoyaltyOnSaleRestoredAsync(c, tx, id, me.Id) is { } restored)
+            {
+                notes.Add($"🏷️ Coupon de fidélité {restored} rétabli");
+            }
             await tx.CommitAsync();
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
@@ -390,7 +441,7 @@ public static class SaleEndpoints
 
         sale.Status = to!;
         sale.Plate = plate;
-        return new(null, sale, from, plate);
+        return new(null, sale, from, plate, notes);
     }
 
     private static string? Clean(string? s, int max)

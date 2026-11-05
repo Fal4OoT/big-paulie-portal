@@ -31,6 +31,11 @@ public static partial class ConfigEndpoints
         public bool TourSkipEmpty { get; set; } = true;
         public int TourLateAfter { get; set; } = 3;
         public string? TourLateRoleId { get; set; }
+        public int CouponMaxPercent { get; set; } = 20;
+        public bool LoyaltyEnabled { get; set; }
+        public int LoyaltyEvery { get; set; } = 5;
+        public int LoyaltyPercent { get; set; } = 10;
+        public int? LoyaltyExpiryDays { get; set; } = 30;
         public List<StatusSetting>? Statuses { get; set; }
     }
 
@@ -304,6 +309,17 @@ public static partial class ConfigEndpoints
             if (input.TourLateAfter is < 0 or > 48) return EndpointAuth.Bad("Retard : entre 0 (désactivé) et 48 tournées.");
             s.TourLateAfter = input.TourLateAfter;
             s.TourLateRoleId = Snow(input.TourLateRoleId);
+
+            if (input.CouponMaxPercent is < 1 or > 100) return EndpointAuth.Bad("Coupon : le maximum doit être entre 1 et 100 %.");
+            if (input.LoyaltyEvery is < 1 or > 100) return EndpointAuth.Bad("Fidélité : un coupon tous les 1 à 100 achats.");
+            if (input.LoyaltyPercent < 1 || input.LoyaltyPercent > input.CouponMaxPercent)
+                return EndpointAuth.Bad($"Fidélité : le pourcentage doit être entre 1 et {input.CouponMaxPercent} % (maximum des coupons).");
+            if (input.LoyaltyExpiryDays is < 1 or > 365) return EndpointAuth.Bad("Fidélité : validité entre 1 et 365 jours (vide = sans expiration).");
+            s.CouponMaxPercent = input.CouponMaxPercent;
+            s.LoyaltyEnabled = input.LoyaltyEnabled;
+            s.LoyaltyEvery = input.LoyaltyEvery;
+            s.LoyaltyPercent = input.LoyaltyPercent;
+            s.LoyaltyExpiryDays = input.LoyaltyExpiryDays;
 
             if (input.Statuses is not null)
             {

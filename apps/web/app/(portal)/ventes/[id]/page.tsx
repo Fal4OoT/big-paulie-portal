@@ -202,6 +202,16 @@ export default function SalePage() {
               )}
             </Info>
             <Info label="Vendeur">{sale.sellerName}</Info>
+            <Info label="Coupon">
+              {sale.couponId ? (
+                <span>
+                  <strong>{sale.couponPercent} %</strong> <span className="font-mono text-xs text-sand">{sale.couponReference}</span>
+                  {sale.couponReason && <div className="text-sm text-cream-muted">{sale.couponReason}</div>}
+                </span>
+              ) : (
+                <span className="text-cream-dim">Aucun</span>
+              )}
+            </Info>
             <Info label="Date de vente">{formatDateTime(sale.createdAt)}</Info>
             <Info label="Livrée le">{formatDateTime(sale.deliveredAt)}</Info>
             {config.saleFields.map((f) => (

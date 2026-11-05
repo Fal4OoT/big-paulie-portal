@@ -81,6 +81,15 @@ public sealed class PortalSettings
     public int TourLateAfter { get; set; } = 3;
     /// <summary>Rôle mentionné à chaque tournée tant qu'il reste des véhicules en retard.</summary>
     public string? TourLateRoleId { get; set; }
+
+    /// <summary>Pourcentage maximum d'un coupon de promotion (manuel ou fidélité).</summary>
+    public int CouponMaxPercent { get; set; } = 20;
+    public bool LoyaltyEnabled { get; set; }
+    /// <summary>Un coupon de fidélité tous les N achats (ventes non annulées).</summary>
+    public int LoyaltyEvery { get; set; } = 5;
+    public int LoyaltyPercent { get; set; } = 10;
+    /// <summary>Validité du coupon de fidélité en jours (null = sans expiration).</summary>
+    public int? LoyaltyExpiryDays { get; set; } = 30;
     public List<StatusSetting> Statuses { get; set; } = new();
 
     public string StatusLabel(string code) =>
@@ -123,6 +132,10 @@ public sealed class SaleView
     public decimal Price { get; set; }
     public bool Immediate { get; set; }
     public bool FromStock { get; set; }
+    public Guid? CouponId { get; set; }
+    public long? CouponNumber { get; set; }
+    public int? CouponPercent { get; set; }
+    public string? CouponReason { get; set; }
     public string? Plate { get; set; }
     public string Status { get; set; } = "";
     public bool PermitWarning { get; set; }

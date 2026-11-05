@@ -4,6 +4,7 @@ import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { ClientCoupons } from "@/components/ClientCoupons";
 import { ClientForm } from "@/components/ClientForm";
 import { FieldDisplay } from "@/components/DynamicFields";
 import { ImagePaste } from "@/components/ImagePaste";
@@ -142,6 +143,8 @@ export default function ClientPage() {
               </div>
             </Card>
           )}
+
+          <ClientCoupons clientId={client.id} />
 
           {can(PERM.salesView) && (
             <Card title={`Achats (${sales.length})`}>

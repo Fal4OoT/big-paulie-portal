@@ -3,8 +3,9 @@
 import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 import { usePortal, useStatus } from "@/lib/portal-context";
-import type { CatalogVehicle, DataRecord, Sale } from "@/lib/types";
+import type { CatalogVehicle, ClientCoupons, Coupon, DataRecord, Sale } from "@/lib/types";
 import { DynamicFields } from "./DynamicFields";
 import { loadCatalog, VehicleSearch } from "./VehicleSearch";
 import { Button, ErrorBox, Input, Label, Modal, Select, Toggle } from "./ui";
@@ -36,6 +37,8 @@ export function SaleFormModal({
   const [price, setPrice] = useState(sale ? String(sale.price) : "");
   const [immediate, setImmediate] = useState(sale?.immediate ?? false);
   const [inStock, setInStock] = useState(false);
+  const [coupons, setCoupons] = useState<Coupon[] | null>(null);
+  const [couponId, setCouponId] = useState<string | null>(sale?.couponId ?? null);
   const [plate, setPlate] = useState(sale?.plate ?? "");
   const [data, setData] = useState<DataRecord>(sale?.data ?? {});
   const [saving, setSaving] = useState(false);
@@ -64,6 +67,14 @@ export function SaleFormModal({
         setOffCatalog(true);
       });
   }, [sale?.catalogVehicleId, sale?.vehicleName]);
+
+  // Coupons utilisables : ceux disponibles du client, plus celui déjà appliqué à la vente modifiée.
+  useEffect(() => {
+    api
+      .get<ClientCoupons>(`/api/clients/${clientId}/coupons`)
+      .then((r) => setCoupons(r.coupons.filter((c) => c.status === "AVAILABLE" || (sale?.couponId && c.id === sale.couponId))))
+      .catch(() => setCoupons([]));
+  }, [clientId, sale?.couponId]);
 
   function selectVehicle(v: CatalogVehicle | null) {
     setCatalogVehicle(v);
@@ -108,6 +119,7 @@ export function SaleFormModal({
         price: p,
         immediate: inStock ? false : immediate,
         inStock: sale ? undefined : inStock,
+        couponId,
         plate: requiresPlate ? plate || null : null,
         data,
       };
@@ -215,6 +227,30 @@ export function SaleFormModal({
               Le client n'a pas de « {permitField?.label ?? "permis"} » renseigné. La vente reste possible, elle sera signalée.
             </span>
           </div>
+        )}
+
+        {coupons && coupons.length > 0 && sale?.status !== "CANCELLED" && (
+          <fieldset className="rounded-lg border border-night-500/70 p-4">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wider text-cream-muted">Coupon de promotion (non cumulable)</legend>
+            <div className="space-y-2">
+              <label className="flex cursor-pointer items-center gap-3 text-sm">
+                <input type="radio" name="coupon" checked={couponId === null} onChange={() => setCouponId(null)} className="h-4 w-4 accent-[#D9A441]" />
+                Aucun coupon
+              </label>
+              {coupons.map((c) => (
+                <label key={c.id} className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                  <input type="radio" name="coupon" checked={couponId === c.id} onChange={() => setCouponId(c.id)} className="h-4 w-4 accent-[#D9A441]" />
+                  <strong>{c.percent} %</strong>
+                  <span className="font-mono text-xs text-sand">{c.reference}</span>
+                  <span className="text-cream-muted">{c.reason}</span>
+                  {c.expiresOn && <span className="text-xs text-cream-dim">· expire le {formatDate(c.expiresOn)}</span>}
+                </label>
+              ))}
+            </div>
+            {couponId && (
+              <p className="mt-3 text-xs text-sand">Le prix n'est pas recalculé : saisis le prix remisé. Le coupon sera marqué comme utilisé sur cet achat.</p>
+            )}
+          </fieldset>
         )}
 
         {config.saleFields.length > 0 && <DynamicFields fields={config.saleFields} value={data} onChange={setData} />}
