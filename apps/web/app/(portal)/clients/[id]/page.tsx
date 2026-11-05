@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ClientCoupons } from "@/components/ClientCoupons";
 import { ClientForm } from "@/components/ClientForm";
+import { ClientReferral } from "@/components/ClientReferral";
 import { FieldDisplay } from "@/components/DynamicFields";
 import { ImagePaste } from "@/components/ImagePaste";
 import { SaleFormModal } from "@/components/SaleForm";
@@ -27,6 +28,7 @@ export default function ClientPage() {
   const [editing, setEditing] = useState(false);
   const [saleOpen, setSaleOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [couponsKey, setCouponsKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -144,7 +146,9 @@ export default function ClientPage() {
             </Card>
           )}
 
-          <ClientCoupons clientId={client.id} />
+          <ClientReferral clientId={client.id} onChanged={() => setCouponsKey((k) => k + 1)} />
+
+          <ClientCoupons clientId={client.id} reloadKey={couponsKey} />
 
           {can(PERM.salesView) && (
             <Card title={`Achats (${sales.length})`}>

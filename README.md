@@ -26,7 +26,7 @@ Dépôt **autonome** : il ne dépend d'aucun autre projet (notamment pas du port
 - **Détection des doublons** (même prénom + nom, renforcée si même date de naissance) avec confirmation explicite.
 - **Ventes** : nom du véhicule, type → catégorie (Terrestre / Maritime / Aérien), prix, date et vendeur automatiques, option **immédiat**, champs complémentaires configurables.
   Avertissement (sans blocage) si le client n'a pas le permis correspondant au type.
-- **Coupons de promotion** (pourcentage plafonné, raison, expiration facultative) attribués sur la fiche client, utilisés à l'achat (un seul, non cumulable), avec qui / quand / sur quel achat. **Fidélité** : un coupon tous les X achats.
+- **Coupons de promotion** (pourcentage plafonné, raison, expiration facultative) attribués sur la fiche client, utilisés à l'achat (un seul, non cumulable), avec qui / quand / sur quel achat. **Fidélité** : un coupon tous les X achats. **Parrainage** : coupon pour le filleul et pour son parrain.
 - **Catalogue** importé depuis le panel légal (copier-coller de la réponse du panel) : recherche du véhicule à la vente, noms uniformes, gammes.
 - **Analyse** : véhicules les plus vendus, gammes, types, vendeurs, ventes par jour, délai de livraison.
 - **Véhicule en stock** : la vente démarre directement en « Réceptionné · à livrer ».

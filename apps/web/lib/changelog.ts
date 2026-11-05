@@ -18,6 +18,18 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.6.0",
+    date: "2026-11-05",
+    title: "Parrainage",
+    changes: [
+      { kind: "nouveau", text: "Parrainage sur la fiche client : un seul parrain par client, lui-même client enregistré, avant le premier achat du filleul. Aucun parrainage croisé possible." },
+      { kind: "nouveau", text: "Le filleul reçoit un coupon utilisable dès son premier achat ; le parrain reçoit le sien quand ce premier achat est enregistré." },
+      { kind: "nouveau", text: "Réglages : pourcentage du parrain et du filleul, validité en jours, nombre de filleuls par parrain (5 par défaut, vide = illimité)." },
+      { kind: "nouveau", text: "Fiche client : « Parrainé par… » et liste des filleuls, avec l'état de leur premier achat." },
+      { kind: "amélioration", text: "Une vente annulée retire aussi le coupon de parrain qu'elle avait généré s'il n'a pas servi." },
+    ],
+  },
+  {
     version: "1.5.0",
     date: "2026-11-05",
     title: "Coupons de promotion et fidélité",

@@ -161,6 +161,7 @@ function CouponItem({ coupon: c, onCancel }: { coupon: Coupon; onCancel?: () => 
         <span className="font-mono text-xs text-sand">{c.reference}</span>
         <Badge color={st.color}>{st.label}</Badge>
         {c.source === "LOYALTY" && <Badge color="#D9A441">Fidélité</Badge>}
+        {c.source === "REFERRAL" && <Badge color="#E07A2F">Parrainage</Badge>}
         <span className="text-xs text-cream-muted">{c.expiresOn ? `Expire le ${formatDate(c.expiresOn)}` : "Sans expiration"}</span>
         {onCancel && (
           <button onClick={onCancel} className="ml-auto rounded p-1 text-cream-dim hover:bg-paulie-red/20 hover:text-red-300" title="Annuler le coupon">
@@ -170,7 +171,7 @@ function CouponItem({ coupon: c, onCancel }: { coupon: Coupon; onCancel?: () => 
       </div>
       <p className="mt-1 text-sm">{c.reason}</p>
       <div className="mt-1 text-xs text-cream-dim">
-        {c.source === "LOYALTY" ? "Généré" : "Attribué"} le {formatDateTime(c.createdAt)}
+        {c.source === "MANUAL" ? "Attribué" : "Généré"} le {formatDateTime(c.createdAt)}
         {c.createdByName && <> par {c.createdByName}</>}
         {c.sourceSaleReference && c.sourceSaleId && (
           <>

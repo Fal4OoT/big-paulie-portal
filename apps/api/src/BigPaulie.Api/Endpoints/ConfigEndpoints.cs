@@ -36,6 +36,11 @@ public static partial class ConfigEndpoints
         public int LoyaltyEvery { get; set; } = 5;
         public int LoyaltyPercent { get; set; } = 10;
         public int? LoyaltyExpiryDays { get; set; } = 30;
+        public bool ReferralEnabled { get; set; }
+        public int ReferralSponsorPercent { get; set; } = 10;
+        public int ReferralGodchildPercent { get; set; } = 10;
+        public int? ReferralExpiryDays { get; set; } = 30;
+        public int? ReferralMaxGodchildren { get; set; } = 5;
         public List<StatusSetting>? Statuses { get; set; }
     }
 
@@ -320,6 +325,17 @@ public static partial class ConfigEndpoints
             s.LoyaltyEvery = input.LoyaltyEvery;
             s.LoyaltyPercent = input.LoyaltyPercent;
             s.LoyaltyExpiryDays = input.LoyaltyExpiryDays;
+
+            foreach (var (label, value) in new[] { ("parrain", input.ReferralSponsorPercent), ("filleul", input.ReferralGodchildPercent) })
+                if (value < 1 || value > input.CouponMaxPercent)
+                    return EndpointAuth.Bad($"Parrainage : le pourcentage du {label} doit être entre 1 et {input.CouponMaxPercent} %.");
+            if (input.ReferralExpiryDays is < 1 or > 365) return EndpointAuth.Bad("Parrainage : validité entre 1 et 365 jours (vide = sans expiration).");
+            if (input.ReferralMaxGodchildren is < 1 or > 1000) return EndpointAuth.Bad("Parrainage : nombre de filleuls entre 1 et 1000 (vide = illimité).");
+            s.ReferralEnabled = input.ReferralEnabled;
+            s.ReferralSponsorPercent = input.ReferralSponsorPercent;
+            s.ReferralGodchildPercent = input.ReferralGodchildPercent;
+            s.ReferralExpiryDays = input.ReferralExpiryDays;
+            s.ReferralMaxGodchildren = input.ReferralMaxGodchildren;
 
             if (input.Statuses is not null)
             {

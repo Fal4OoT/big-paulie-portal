@@ -196,6 +196,75 @@ export function SettingsEditor({ admin, onSaved }: { admin: AdminConfig; onSaved
               </p>
             </div>
           )}
+
+          <Toggle checked={s.referralEnabled} onChange={(v) => set({ referralEnabled: v })} label="Parrainage" />
+          {s.referralEnabled && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <Label>Coupon du filleul</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={s.couponMaxPercent}
+                    value={s.referralGodchildPercent}
+                    onChange={(e) => set({ referralGodchildPercent: Math.max(1, Number(e.target.value) || 1) })}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-cream-muted">%</span>
+                </div>
+              </div>
+              <div>
+                <Label>Coupon du parrain</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={s.couponMaxPercent}
+                    value={s.referralSponsorPercent}
+                    onChange={(e) => set({ referralSponsorPercent: Math.max(1, Number(e.target.value) || 1) })}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-cream-muted">%</span>
+                </div>
+              </div>
+              <div>
+                <Label>Valable</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={s.referralExpiryDays ?? ""}
+                    placeholder="∞"
+                    onChange={(e) => set({ referralExpiryDays: e.target.value === "" ? null : Math.max(1, Number(e.target.value) || 1) })}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-cream-muted">jours</span>
+                </div>
+              </div>
+              <div>
+                <Label>Filleuls par parrain</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={1000}
+                    value={s.referralMaxGodchildren ?? ""}
+                    placeholder="∞"
+                    onChange={(e) => set({ referralMaxGodchildren: e.target.value === "" ? null : Math.max(1, Number(e.target.value) || 1) })}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-cream-muted">max</span>
+                </div>
+              </div>
+              <p className="text-xs text-cream-dim sm:col-span-2 lg:col-span-4">
+                Le filleul reçoit son coupon dès l'enregistrement du parrain (utilisable sur son premier achat). Le parrain reçoit le sien quand le
+                premier achat du filleul est enregistré. Le parrain doit avoir une fiche client, le parrainage se fait avant le premier achat du filleul,
+                et aucun parrainage croisé n'est possible. Vide = sans expiration / illimité.
+              </p>
+            </div>
+          )}
         </div>
       </Card>
 

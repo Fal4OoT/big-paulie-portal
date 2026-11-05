@@ -15,6 +15,7 @@ public static class Permissions
     public const string SalesCancel = "sales.cancel";
     public const string CouponsCreate = "coupons.create";
     public const string CouponsCancel = "coupons.cancel";
+    public const string ReferralsManage = "referrals.manage";
     public const string TourView = "tour.view";
     public const string StatsView = "stats.view";
     public const string LogsView = "logs.view";
@@ -36,6 +37,7 @@ public static class Permissions
         new(SalesCancel, "Annuler / rétablir une vente", "Ventes"),
         new(CouponsCreate, "Attribuer un coupon de promotion", "Ventes"),
         new(CouponsCancel, "Annuler un coupon de promotion", "Ventes"),
+        new(ReferralsManage, "Enregistrer un parrainage", "Clients"),
         new(TourView, "Voir la tournée", "Logistique"),
         new(StatsView, "Voir l'analyse des ventes", "Logistique"),
         new(LogsView, "Voir les logs", "Administration"),

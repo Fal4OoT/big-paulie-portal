@@ -3,6 +3,14 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.6.0 — 05/11/2026 · Parrainage
+
+- **Nouveau** : parrainage sur la fiche client. Un seul parrain par client, lui-même client enregistré, à enregistrer avant le premier achat du filleul. Aucun parrainage croisé, même en chaîne. Permission « Enregistrer un parrainage » (tous les grades de la concession par défaut).
+- **Nouveau** : le filleul reçoit un coupon utilisable dès son premier achat ; le parrain reçoit le sien quand ce premier achat est enregistré.
+- **Nouveau** : réglages (Coupons & fidélité) : pourcentage du parrain et du filleul, validité en jours, nombre de filleuls par parrain (5 par défaut, vide = illimité).
+- **Nouveau** : fiche client : « Parrainé par… » et liste des filleuls avec l'état de leur premier achat. Le parrain peut être changé ou retiré tant que les coupons n'ont pas servi.
+- **Amélioration** : une vente annulée retire aussi le coupon de parrain qu'elle avait généré s'il n'a pas servi.
+
 ## v1.5.0 — 05/11/2026 · Coupons de promotion et fidélité
 
 - **Nouveau** : coupons de promotion sur la fiche client : pourcentage (20 % maximum, réglable), raison et date d'expiration facultative. Attribution et annulation selon le grade (permissions « Attribuer / Annuler un coupon », Patron et Chef de service par défaut).

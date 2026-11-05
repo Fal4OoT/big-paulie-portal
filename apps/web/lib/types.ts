@@ -46,7 +46,7 @@ export interface Coupon {
   percent: number;
   reason: string;
   expiresOn: string | null;
-  source: "MANUAL" | "LOYALTY";
+  source: "MANUAL" | "LOYALTY" | "REFERRAL";
   sourceSaleId: string | null;
   sourceSaleReference: string | null;
   createdByName: string | null;
@@ -66,6 +66,20 @@ export interface ClientCoupons {
   coupons: Coupon[];
   loyalty: { enabled: boolean; every: number; percent: number; expiryDays: number | null; purchases: number; progress: number };
   maxPercent: number;
+}
+
+export interface ClientReferral {
+  enabled: boolean;
+  sponsor: { id: string; name: string } | null;
+  sponsorSetAt: string | null;
+  sponsorSetByName: string | null;
+  purchases: number;
+  canSetSponsor: boolean;
+  lockReason: string | null;
+  godchildren: { id: string; name: string; since: string | null; purchases: number; sponsorRewarded: boolean }[];
+  maxGodchildren: number | null;
+  sponsorPercent: number;
+  godchildPercent: number;
 }
 
 export interface CatalogVehicle {
@@ -258,6 +272,11 @@ export interface PortalSettings {
   loyaltyEvery: number;
   loyaltyPercent: number;
   loyaltyExpiryDays: number | null;
+  referralEnabled: boolean;
+  referralSponsorPercent: number;
+  referralGodchildPercent: number;
+  referralExpiryDays: number | null;
+  referralMaxGodchildren: number | null;
   statuses: StatusSetting[];
 }
 

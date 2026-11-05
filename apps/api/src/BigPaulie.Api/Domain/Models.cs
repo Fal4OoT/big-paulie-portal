@@ -90,6 +90,16 @@ public sealed class PortalSettings
     public int LoyaltyPercent { get; set; } = 10;
     /// <summary>Validité du coupon de fidélité en jours (null = sans expiration).</summary>
     public int? LoyaltyExpiryDays { get; set; } = 30;
+
+    public bool ReferralEnabled { get; set; }
+    /// <summary>Coupon du parrain, généré au premier achat du filleul.</summary>
+    public int ReferralSponsorPercent { get; set; } = 10;
+    /// <summary>Coupon du filleul, généré à l'enregistrement du parrainage.</summary>
+    public int ReferralGodchildPercent { get; set; } = 10;
+    /// <summary>Validité des coupons de parrainage en jours (null = sans expiration).</summary>
+    public int? ReferralExpiryDays { get; set; } = 30;
+    /// <summary>Nombre maximum de filleuls par parrain (null = illimité).</summary>
+    public int? ReferralMaxGodchildren { get; set; } = 5;
     public List<StatusSetting> Statuses { get; set; } = new();
 
     public string StatusLabel(string code) =>

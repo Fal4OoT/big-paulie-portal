@@ -108,29 +108,101 @@ public static class CouponService
         return $"{Ref(created.Number)} ({percent} %)";
     }
 
-    /// <summary>Vente annulée : le coupon de fidélité qu'elle avait généré est annulé s'il n'a pas encore servi.</summary>
-    public static async Task<string?> LoyaltyOnSaleCancelledAsync(NpgsqlConnection c, NpgsqlTransaction tx, Guid saleId, Guid actorId)
+    /// <summary>
+    /// Vente annulée : les coupons qu'elle avait générés (fidélité, parrainage côté parrain) sont annulés
+    /// s'ils n'ont pas encore servi. Renvoie leurs références.
+    /// </summary>
+    public static async Task<List<string>> GeneratedOnSaleCancelledAsync(NpgsqlConnection c, NpgsqlTransaction tx, Guid saleId, Guid actorId)
     {
-        var cp = await c.QuerySingleOrDefaultAsync<CouponRef>("""
+        var rows = (await c.QueryAsync<CouponRef>("""
             UPDATE coupons SET cancelled_at = now(), cancelled_by = @actor, cancel_reason = 'Vente annulée', cancelled_with_sale = true
-            WHERE source = 'LOYALTY' AND source_sale_id = @saleId AND used_sale_id IS NULL AND cancelled_at IS NULL
+            WHERE source IN ('LOYALTY', 'REFERRAL') AND source_sale_id = @saleId AND used_sale_id IS NULL AND cancelled_at IS NULL
             RETURNING id, number
-            """, new { saleId, actor = actorId == Guid.Empty ? (Guid?)null : actorId }, tx);
-        if (cp is null) return null;
-        await EventAsync(c, tx, cp.Id, "CANCELLED", saleId, "Vente annulée", actorId);
-        return Ref(cp.Number);
+            """, new { saleId, actor = actorId == Guid.Empty ? (Guid?)null : actorId }, tx)).ToList();
+        foreach (var cp in rows) await EventAsync(c, tx, cp.Id, "CANCELLED", saleId, "Vente annulée", actorId);
+        return rows.Select(r => Ref(r.Number)).ToList();
     }
 
-    /// <summary>Vente rétablie : le coupon de fidélité annulé avec elle redevient disponible.</summary>
-    public static async Task<string?> LoyaltyOnSaleRestoredAsync(NpgsqlConnection c, NpgsqlTransaction tx, Guid saleId, Guid actorId)
+    /// <summary>
+    /// Vente rétablie : les coupons annulés avec elle redeviennent disponibles. Un coupon de parrain n'est rétabli
+    /// que si aucun autre n'a été généré entre-temps pour le même filleul (un seul par filleul).
+    /// </summary>
+    public static async Task<List<string>> GeneratedOnSaleRestoredAsync(NpgsqlConnection c, NpgsqlTransaction tx, Guid saleId, Guid actorId)
     {
-        var cp = await c.QuerySingleOrDefaultAsync<CouponRef>("""
-            UPDATE coupons SET cancelled_at = NULL, cancelled_by = NULL, cancel_reason = NULL, cancelled_with_sale = false
-            WHERE source = 'LOYALTY' AND source_sale_id = @saleId AND cancelled_with_sale
+        var rows = (await c.QueryAsync<CouponRef>("""
+            UPDATE coupons cp SET cancelled_at = NULL, cancelled_by = NULL, cancel_reason = NULL, cancelled_with_sale = false
+            WHERE cp.source_sale_id = @saleId AND cp.cancelled_with_sale
+              AND (cp.source = 'LOYALTY'
+                   OR NOT EXISTS (SELECT 1 FROM coupons o WHERE o.id <> cp.id AND o.source = 'REFERRAL' AND o.referral_role = 'SPONSOR'
+                                  AND o.referral_godchild_id = cp.referral_godchild_id AND o.cancelled_at IS NULL))
             RETURNING id, number
-            """, new { saleId }, tx);
-        if (cp is null) return null;
-        await EventAsync(c, tx, cp.Id, "RESTORED", saleId, "Vente rétablie", actorId);
-        return Ref(cp.Number);
+            """, new { saleId }, tx)).ToList();
+        foreach (var cp in rows) await EventAsync(c, tx, cp.Id, "RESTORED", saleId, "Vente rétablie", actorId);
+        return rows.Select(r => Ref(r.Number)).ToList();
     }
+
+    // ---------- Parrainage ----------
+
+    /// <summary>Crée un coupon de parrainage. Renvoie sa référence.</summary>
+    public static async Task<string> CreateReferralCouponAsync(NpgsqlConnection c, NpgsqlTransaction tx, PortalSettings s,
+        Guid ownerId, Guid godchildId, string role, int percent, string reason, Guid? saleId, Guid actorId, DateOnly today)
+    {
+        percent = Math.Clamp(percent, 1, s.CouponMaxPercent);
+        var expires = s.ReferralExpiryDays is > 0 ? today.AddDays(s.ReferralExpiryDays.Value) : (DateOnly?)null;
+        var created = await c.QuerySingleAsync<CouponRef>("""
+            INSERT INTO coupons (client_id, percent, reason, expires_on, source, source_sale_id, referral_godchild_id, referral_role, created_by)
+            VALUES (@ownerId, @percent, @reason, @expires::date, 'REFERRAL', @saleId, @godchildId, @role, @actor)
+            RETURNING id, number
+            """, new
+        {
+            ownerId,
+            percent,
+            reason,
+            expires = expires?.ToDateTime(TimeOnly.MinValue),
+            saleId,
+            godchildId,
+            role,
+            actor = actorId == Guid.Empty ? (Guid?)null : actorId,
+        }, tx);
+        await EventAsync(c, tx, created.Id, "CREATED", saleId, reason, actorId);
+        return $"{Ref(created.Number)} ({percent} %)";
+    }
+
+    /// <summary>
+    /// Premier achat d'un filleul : son parrain reçoit son coupon (une seule fois par filleul).
+    /// Renvoie la référence du coupon et l'id du parrain, ou null.
+    /// </summary>
+    public static async Task<SponsorReward?> ReferralOnSaleCreatedAsync(NpgsqlConnection c, NpgsqlTransaction tx,
+        PortalSettings s, Guid clientId, Guid saleId, Guid actorId, DateOnly today)
+    {
+        if (!s.ReferralEnabled) return null;
+        var sponsor = await c.QuerySingleOrDefaultAsync<SponsorRow>("""
+            SELECT sp.id, sp.data::text AS data_json, cl.data::text AS godchild_json
+            FROM clients cl JOIN clients sp ON sp.id = cl.sponsor_id AND sp.deleted_at IS NULL
+            WHERE cl.id = @clientId
+            """, new { clientId }, tx);
+        if (sponsor is null) return null;
+
+        var already = await c.ExecuteScalarAsync<bool>("""
+            SELECT EXISTS (SELECT 1 FROM coupons WHERE source = 'REFERRAL' AND referral_role = 'SPONSOR'
+                           AND referral_godchild_id = @clientId AND cancelled_at IS NULL)
+            """, new { clientId }, tx);
+        if (already) return null;
+
+        var godchildName = FullName(sponsor.GodchildJson);
+        var label = await CreateReferralCouponAsync(c, tx, s, sponsor.Id, clientId, "SPONSOR", s.ReferralSponsorPercent,
+            $"Parrainage : premier achat de {godchildName}", saleId, actorId, today);
+        return new SponsorReward(label, sponsor.Id, FullName(sponsor.DataJson), godchildName);
+    }
+
+    public sealed record SponsorReward(string Label, Guid SponsorId, string SponsorName, string GodchildName);
+
+    private sealed class SponsorRow
+    {
+        public Guid Id { get; set; }
+        public string DataJson { get; set; } = "{}";
+        public string GodchildJson { get; set; } = "{}";
+    }
+
+    public static string FullName(string json) => Endpoints.ClientEndpoints.FullName(FieldValidator.ParseObject(json));
 }

@@ -188,6 +188,7 @@ public static class SaleEndpoints
             }
             var settingsForLoyalty = await config.GetSettingsAsync();
             var loyaltyLabel = await CouponService.LoyaltyOnSaleCreatedAsync(c, tx, settingsForLoyalty, input.ClientId, created.Id, me.Id, today);
+            var sponsorReward = await CouponService.ReferralOnSaleCreatedAsync(c, tx, settingsForLoyalty, input.ClientId, created.Id, me.Id, today);
             await tx.CommitAsync();
 
             var reference = Ref(created.Number);
@@ -204,6 +205,10 @@ public static class SaleEndpoints
             if (loyaltyLabel is not null)
                 await audit.LogAsync(me, "coupon.created", "client", input.ClientId.ToString(), "Coupon de fidélité généré",
                     $"**{loyaltyLabel}** pour **{clientName}** grâce à la vente {reference}.", $"/clients/{input.ClientId}");
+            if (sponsorReward is not null)
+                await audit.LogAsync(me, "coupon.created", "client", sponsorReward.SponsorId.ToString(), "Coupon de parrainage généré",
+                    $"**{sponsorReward.Label}** pour **{sponsorReward.SponsorName}** : premier achat de son filleul **{clientName}** ({reference}).",
+                    $"/clients/{sponsorReward.SponsorId}");
 
             // Vente immédiate : le tableau de tournée est reposté avec mention du rôle « immédiat ».
             var board = http.RequestServices.GetRequiredService<TourBoardService>();
@@ -425,12 +430,13 @@ public static class SaleEndpoints
             {
                 if (await CouponService.ReleaseAsync(c, tx, id, me.Id, $"Vente {Ref(sale.Number)} annulée") is { } released)
                     notes.Add($"🏷️ Coupon {released} de nouveau disponible");
-                if (await CouponService.LoyaltyOnSaleCancelledAsync(c, tx, id, me.Id) is { } loyalty)
-                    notes.Add($"🏷️ Coupon de fidélité {loyalty} annulé");
+                foreach (var generated in await CouponService.GeneratedOnSaleCancelledAsync(c, tx, id, me.Id))
+                    notes.Add($"🏷️ Coupon {generated} (généré par cette vente) annulé");
             }
-            else if (from == SaleStatus.Cancelled && await CouponService.LoyaltyOnSaleRestoredAsync(c, tx, id, me.Id) is { } restored)
+            else if (from == SaleStatus.Cancelled)
             {
-                notes.Add($"🏷️ Coupon de fidélité {restored} rétabli");
+                foreach (var restored in await CouponService.GeneratedOnSaleRestoredAsync(c, tx, id, me.Id))
+                    notes.Add($"🏷️ Coupon {restored} rétabli");
             }
             await tx.CommitAsync();
         }

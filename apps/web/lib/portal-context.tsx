@@ -42,6 +42,7 @@ export const PERM = {
   salesCancel: "sales.cancel",
   couponsCreate: "coupons.create",
   couponsCancel: "coupons.cancel",
+  referralsManage: "referrals.manage",
   tourView: "tour.view",
   statsView: "stats.view",
   logsView: "logs.view",
