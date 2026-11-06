@@ -13,6 +13,10 @@ public static class CouponService
 {
     public static string Ref(long number) => $"CP-{number:0000}";
 
+    /// <summary>Achats qui comptent pour la fidélité : ventes non annulées d'au moins le montant minimum.</summary>
+    public const string LoyaltyCountSql =
+        "SELECT count(*)::int FROM sales WHERE client_id = @clientId AND status <> 'CANCELLED' AND price >= @min";
+
     /// <summary>Date du jour à Paris : un coupon est valable jusqu'à sa date d'expiration incluse.</summary>
     public static DateOnly Today(PortalOptions opt) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TourService.ResolveTimeZone(opt.TimeZone)));
@@ -85,8 +89,10 @@ public static class CouponService
         Guid clientId, Guid saleId, Guid actorId, DateOnly today)
     {
         if (!s.LoyaltyEnabled || s.LoyaltyEvery < 1 || s.LoyaltyPercent < 1) return null;
-        var count = await c.ExecuteScalarAsync<int>(
-            "SELECT count(*)::int FROM sales WHERE client_id = @clientId AND status <> 'CANCELLED'", new { clientId }, tx);
+        // Un achat sous le montant minimum ne fait pas avancer la fidélité.
+        var price = await c.ExecuteScalarAsync<decimal>("SELECT price FROM sales WHERE id = @saleId", new { saleId }, tx);
+        if (price < s.LoyaltyMinAmount) return null;
+        var count = await c.ExecuteScalarAsync<int>(LoyaltyCountSql, new { clientId, min = s.LoyaltyMinAmount }, tx);
         if (count % s.LoyaltyEvery != 0) return null;
 
         var percent = Math.Min(s.LoyaltyPercent, s.CouponMaxPercent);

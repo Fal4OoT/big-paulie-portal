@@ -169,7 +169,7 @@ export function SettingsEditor({
 
           <Toggle checked={s.loyaltyEnabled} onChange={(v) => set({ loyaltyEnabled: v })} label="Programme de fidélité" />
           {s.loyaltyEnabled && (
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <Label>Un coupon tous les</Label>
                 <div className="flex items-center gap-2">
@@ -192,6 +192,20 @@ export function SettingsEditor({
                 </div>
               </div>
               <div>
+                <Label>Montant minimum par achat</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={s.loyaltyMinAmount || ""}
+                    placeholder="aucun"
+                    onChange={(e) => set({ loyaltyMinAmount: Math.max(0, Number(e.target.value) || 0) })}
+                    className="w-32"
+                  />
+                  <span className="text-sm text-cream-muted">$</span>
+                </div>
+              </div>
+              <div>
                 <Label>Valable</Label>
                 <div className="flex items-center gap-2">
                   <Input
@@ -206,8 +220,8 @@ export function SettingsEditor({
                   <span className="text-sm text-cream-muted">jours (vide = sans expiration)</span>
                 </div>
               </div>
-              <p className="text-xs text-cream-dim sm:col-span-3">
-                Toute vente non annulée compte, dès sa création. Exemple : tous les {s.loyaltyEvery} achats, le client reçoit un coupon de{" "}
+              <p className="text-xs text-cream-dim sm:col-span-2 lg:col-span-4">
+                Toute vente non annulée compte dès sa création{s.loyaltyMinAmount > 0 ? `, si son prix de vente atteint ${s.loyaltyMinAmount.toLocaleString("fr-FR")} $` : ""} (ventes passées comprises). Exemple : tous les {s.loyaltyEvery} achats, le client reçoit un coupon de{" "}
                 {s.loyaltyPercent} % dans sa liste. Si la vente qui l'a généré est annulée, le coupon est retiré tant qu'il n'a pas servi.
               </p>
             </div>

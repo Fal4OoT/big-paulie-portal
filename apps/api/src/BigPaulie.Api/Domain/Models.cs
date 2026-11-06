@@ -103,6 +103,8 @@ public sealed class PortalSettings
     public int LoyaltyPercent { get; set; } = 10;
     /// <summary>Validité du coupon de fidélité en jours (null = sans expiration).</summary>
     public int? LoyaltyExpiryDays { get; set; } = 30;
+    /// <summary>Prix de vente minimum pour qu'un achat compte dans la fidélité (0 = tous les achats).</summary>
+    public decimal LoyaltyMinAmount { get; set; }
 
     public bool ReferralEnabled { get; set; }
     /// <summary>Coupon du parrain, généré au premier achat du filleul.</summary>

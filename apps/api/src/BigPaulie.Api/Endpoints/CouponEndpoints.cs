@@ -88,6 +88,7 @@ public static class CouponEndpoints
             var settings = await config.GetSettingsAsync();
             var purchases = await c.ExecuteScalarAsync<int>(
                 "SELECT count(*)::int FROM sales WHERE client_id = @id AND status <> 'CANCELLED'", new { id });
+            var qualifying = await c.ExecuteScalarAsync<int>(CouponService.LoyaltyCountSql, new { clientId = id, min = settings.LoyaltyMinAmount });
 
             return Results.Ok(new
             {
@@ -127,7 +128,9 @@ public static class CouponEndpoints
                     percent = Math.Min(settings.LoyaltyPercent, settings.CouponMaxPercent),
                     expiryDays = settings.LoyaltyExpiryDays,
                     purchases,
-                    progress = settings.LoyaltyEvery > 0 ? purchases % settings.LoyaltyEvery : 0,
+                    qualifying,
+                    minAmount = settings.LoyaltyMinAmount,
+                    progress = settings.LoyaltyEvery > 0 ? qualifying % settings.LoyaltyEvery : 0,
                 },
                 maxPercent = settings.CouponMaxPercent,
             });

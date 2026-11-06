@@ -36,6 +36,7 @@ public static partial class ConfigEndpoints
         public int LoyaltyEvery { get; set; } = 5;
         public int LoyaltyPercent { get; set; } = 10;
         public int? LoyaltyExpiryDays { get; set; } = 30;
+        public decimal LoyaltyMinAmount { get; set; }
         public bool ReferralEnabled { get; set; }
         public int ReferralSponsorPercent { get; set; } = 10;
         public int ReferralGodchildPercent { get; set; } = 10;
@@ -336,6 +337,8 @@ public static partial class ConfigEndpoints
             s.LoyaltyEvery = input.LoyaltyEvery;
             s.LoyaltyPercent = input.LoyaltyPercent;
             s.LoyaltyExpiryDays = input.LoyaltyExpiryDays;
+            if (input.LoyaltyMinAmount is < 0 or > 1_000_000_000) return EndpointAuth.Bad("Fidélité : montant minimum invalide.");
+            s.LoyaltyMinAmount = Math.Round(input.LoyaltyMinAmount, 2);
 
             foreach (var (label, value) in new[] { ("parrain", input.ReferralSponsorPercent), ("filleul", input.ReferralGodchildPercent) })
                 if (value < 1 || value > input.CouponMaxPercent)

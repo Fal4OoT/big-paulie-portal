@@ -64,7 +64,16 @@ export interface Coupon {
 
 export interface ClientCoupons {
   coupons: Coupon[];
-  loyalty: { enabled: boolean; every: number; percent: number; expiryDays: number | null; purchases: number; progress: number };
+  loyalty: {
+    enabled: boolean;
+    every: number;
+    percent: number;
+    expiryDays: number | null;
+    purchases: number;
+    qualifying: number;
+    minAmount: number;
+    progress: number;
+  };
   maxPercent: number;
 }
 
@@ -380,6 +389,7 @@ export interface PortalSettings {
   loyaltyEvery: number;
   loyaltyPercent: number;
   loyaltyExpiryDays: number | null;
+  loyaltyMinAmount: number;
   referralEnabled: boolean;
   referralSponsorPercent: number;
   referralGodchildPercent: number;

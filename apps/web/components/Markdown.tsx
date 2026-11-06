@@ -116,10 +116,11 @@ export function Markdown({ source }: { source: string }) {
     }
 
     if (/^\s*[-*]\s+/.test(line)) {
+      const nested = /^\s{2,}[-*]\s+/.test(line);
       const items: string[] = [];
       while (i < src.length && /^\s*[-*]\s+/.test(src[i])) items.push(src[i++].replace(/^\s*[-*]\s+/, ""));
       blocks.push(
-        <ul key={key} className="list-disc space-y-1 pl-6 marker:text-sand">
+        <ul key={key} className={nested ? "list-[circle] space-y-1 pl-12 marker:text-sand" : "list-disc space-y-1 pl-6 marker:text-sand"}>
           {items.map((it, j) => (
             <li key={j}>{inline(it, `${key}-${j}`)}</li>
           ))}
@@ -129,10 +130,12 @@ export function Markdown({ source }: { source: string }) {
     }
 
     if (/^\s*\d+[.)]\s+/.test(line)) {
+      // La numérotation reprend au bon chiffre après une sous-liste (« 5. » reste 5).
+      const start = Number(/^\s*(\d+)/.exec(line)?.[1] ?? 1);
       const items: string[] = [];
       while (i < src.length && /^\s*\d+[.)]\s+/.test(src[i])) items.push(src[i++].replace(/^\s*\d+[.)]\s+/, ""));
       blocks.push(
-        <ol key={key} className="list-decimal space-y-1 pl-6 marker:font-semibold marker:text-sand">
+        <ol key={key} start={start} className="list-decimal space-y-1 pl-6 marker:font-semibold marker:text-sand">
           {items.map((it, j) => (
             <li key={j}>{inline(it, `${key}-${j}`)}</li>
           ))}

@@ -3,6 +3,12 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.10.0 — 07/11/2026 · Guide du portail et montant minimum de fidélité
+
+- **Nouveau** : guide d'utilisation dans Formation (catégorie « Guide du portail », 10 fiches) : prise en main, clients, achats, livraison, tournée, avantages clients, partenariat, bot Discord, configuration et questions fréquentes. Modifiables par le Patron comme toute fiche.
+- **Nouveau** : fidélité : montant minimum par achat (Configuration → Avantages clients). Seuls les achats dont le prix de vente saisi atteint ce montant comptent, ventes passées comprises. La fiche client affiche les achats qui comptent.
+- **Correction** : formation : une liste numérotée reprend au bon numéro après une sous-liste.
+
 ## v1.9.2 — 05/11/2026 · Suppression d'un partenariat
 
 - **Amélioration** : un partenariat peut être supprimé définitivement (Configuration → Avantages clients → Partenariats), en plus d'être désactivé. Ses customisations validées sont supprimées avec lui et les grades reliés sont détachés (pas supprimés). Le détail est affiché avant de confirmer.

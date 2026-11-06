@@ -18,6 +18,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.10.0",
+    date: "2026-11-07",
+    title: "Guide du portail et montant minimum de fidélité",
+    changes: [
+      { kind: "nouveau", text: "Guide d'utilisation dans Formation (catégorie « Guide du portail ») : prise en main, clients, achats, livraison, tournée, avantages clients, partenariat, bot Discord, configuration et questions fréquentes. Les fiches restent modifiables par le Patron." },
+      { kind: "nouveau", text: "Fidélité : montant minimum par achat. Seuls les achats dont le prix de vente atteint ce montant font avancer le compteur (ventes passées comprises)." },
+      { kind: "correction", text: "Formation : une liste numérotée reprend au bon numéro après une sous-liste." },
+    ],
+  },
+  {
     version: "1.9.2",
     date: "2026-11-05",
     title: "Suppression d'un partenariat",

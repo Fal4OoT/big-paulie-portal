@@ -4,7 +4,7 @@ import { Ban, Gift, Plus, Tag } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
-import { cn, formatDate, formatDateTime } from "@/lib/format";
+import { cn, formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { PERM, useCan } from "@/lib/portal-context";
 import type { ClientCoupons as ClientCouponsData, Coupon, CouponStatus } from "@/lib/types";
 import { Badge, Button, Card, Empty, ErrorBox, Input, Label, Modal, Spinner } from "./ui";
@@ -137,7 +137,11 @@ function LoyaltyProgress({ loyalty }: { loyalty: ClientCouponsData["loyalty"] })
         <span>
           Fidélité : <strong>{loyalty.progress}</strong> / {loyalty.every} vers le prochain coupon de <strong>{loyalty.percent} %</strong>
         </span>
-        <span className="ml-auto text-xs text-cream-dim">{loyalty.purchases} achat(s) au total</span>
+        <span className="ml-auto text-xs text-cream-dim">
+          {loyalty.minAmount > 0
+            ? `${loyalty.qualifying} achat(s) de ${formatMoney(loyalty.minAmount)} minimum · ${loyalty.purchases} au total`
+            : `${loyalty.purchases} achat(s) au total`}
+        </span>
       </div>
       {loyalty.every <= 20 && (
         <div className="flex gap-1" aria-hidden>
