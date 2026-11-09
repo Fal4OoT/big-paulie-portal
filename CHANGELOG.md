@@ -3,6 +3,10 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.12.0 — 09/11/2026 · Récap Discord
+
+- **Nouveau** : Analyse → bouton « Récap Discord ». Génère un message mis en forme pour Discord, à copier en un clic : semaine dernière (lundi → dimanche), semaine en cours ou période affichée. Contenu : ventes et livraisons avec évolution par rapport à la période précédente, top 5 véhicules, podium des vendeurs, clients (nouveaux, premier achat, déjà clients). Montants, comparaison et chaque section activables ; choix mémorisés dans le navigateur. Compteur de la limite de 2000 caractères.
+
 ## v1.11.0 — 09/11/2026 · Analyse des clients et tri de la liste des clients
 
 - **Nouveau** : Analyse → Clients, sur la période choisie : nouveaux clients enregistrés (et courbe par jour), clients acheteurs répartis entre premier achat et déjà clients, clients ayant acheté plusieurs fois, part des nouveaux clients qui ont acheté, montant moyen par client acheteur, top 10 des clients (nombre d'achats ou montant).

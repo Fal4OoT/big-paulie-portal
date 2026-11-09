@@ -1,8 +1,10 @@
 "use client";
 
+import { MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Card, Empty, ErrorBox, Input, PageHeader, Spinner } from "@/components/ui";
+import { Button, Card, Empty, ErrorBox, Input, PageHeader, Spinner } from "@/components/ui";
+import { WeeklyRecapModal } from "@/components/WeeklyRecap";
 import { api } from "@/lib/api";
 import { cn, formatDate, formatMoney } from "@/lib/format";
 import type { StatsData, StatsGroup } from "@/lib/types";
@@ -27,6 +29,7 @@ export default function AnalysePage() {
   const [to, setTo] = useState(todayParis);
   const [from, setFrom] = useState(() => shift(todayParis(), -6));
   const [metric, setMetric] = useState<Metric>("count");
+  const [recapOpen, setRecapOpen] = useState(false);
   const [data, setData] = useState<StatsData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -55,7 +58,16 @@ export default function AnalysePage() {
 
   return (
     <>
-      <PageHeader title="Analyse" subtitle="Ventes non annulées, par date de vente (heure de Paris)." />
+      <PageHeader
+        title="Analyse"
+        subtitle="Ventes non annulées, par date de vente (heure de Paris)."
+        actions={
+          <Button variant="secondary" onClick={() => setRecapOpen(true)}>
+            <MessageSquareText className="h-4 w-4" /> Récap Discord
+          </Button>
+        }
+      />
+      {recapOpen && <WeeklyRecapModal open onClose={() => setRecapOpen(false)} current={{ from, to }} />}
 
       {/* Filtres : une seule ligne au-dessus des graphiques */}
       <div className="mb-6 flex flex-wrap items-end gap-3">

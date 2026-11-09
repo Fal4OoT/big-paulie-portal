@@ -18,6 +18,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.12.0",
+    date: "2026-11-09",
+    title: "Récap Discord",
+    changes: [
+      { kind: "nouveau", text: "Analyse → Récap Discord : message prêt à copier-coller pour l'équipe (semaine dernière, semaine en cours ou période affichée) avec ventes, livraisons, comparaison avec la période précédente, top véhicules, podium des vendeurs et clients. Sections et montants à afficher au choix." },
+    ],
+  },
+  {
     version: "1.11.0",
     date: "2026-11-09",
     title: "Analyse des clients et tri de la liste des clients",
