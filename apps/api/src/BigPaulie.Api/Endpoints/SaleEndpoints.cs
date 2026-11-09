@@ -38,6 +38,32 @@ public static class SaleEndpoints
         public string? GiftChoice { get; set; }
     }
 
+    public sealed class ContactInput
+    {
+        public string? Outcome { get; set; }
+        public string? Note { get; set; }
+        /// <summary>Rendez-vous (heure de Paris, « AAAA-MM-JJTHH:mm ») quand Outcome = APPOINTMENT.</summary>
+        public string? AppointmentAt { get; set; }
+    }
+
+    public sealed class DeliveryInput
+    {
+        /// <summary>Heure de Paris « AAAA-MM-JJTHH:mm », ou null pour retirer le rendez-vous.</summary>
+        public string? DeliveryAt { get; set; }
+    }
+
+    /// <summary>Heure locale saisie dans le portail (input datetime-local) → UTC. Null si vide ou invalide.</summary>
+    private static DateTime? ParseLocal(string? value, PortalOptions opt)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (!DateTime.TryParseExact(value.Trim(), new[] { "yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd'T'HH:mm:ss" }, CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var local)) return null;
+        return RecapService.ToUtc(local, TourService.ResolveTimeZone(opt.TimeZone));
+    }
+
+    private static string LocalLabel(DateTime utc, PortalOptions opt) =>
+        TimeZoneInfo.ConvertTimeFromUtc(utc, TourService.ResolveTimeZone(opt.TimeZone)).ToString("dd/MM 'à' HH'h'mm", CultureInfo.InvariantCulture);
+
     public sealed class BulkStatusInput
     {
         public Guid[] Ids { get; set; } = Array.Empty<Guid>();
@@ -50,13 +76,21 @@ public static class SaleEndpoints
                c.data->>'telephone' AS client_phone,
                s.vehicle_name, s.vehicle_type_id, vt.label AS vehicle_type_label, vt.category_id, vc.label AS category_label, coalesce(vt.requires_plate, vc.requires_plate) AS requires_plate,
                s.price, s.immediate, s.from_stock, s.coupon_id, cp.number AS coupon_number, cp.percent AS coupon_percent, cp.reason AS coupon_reason, s.gift, s.plate, s.status, s.permit_warning, s.data::text AS data_json,
-               s.seller_id, u.display_name AS seller_name, s.created_at, s.updated_at, s.delivered_at
+               s.seller_id, u.display_name AS seller_name, s.created_at, s.updated_at, s.delivered_at, s.delivery_at,
+               CASE WHEN c.note_alert THEN c.internal_note END AS client_alert,
+               lc.outcome AS last_contact_outcome, lc.at AS last_contact_at, lc.note AS last_contact_note, lc.by_name AS last_contact_by,
+               (SELECT count(*)::int FROM sale_contacts scn WHERE scn.sale_id = s.id) AS contact_count
         FROM sales s
         JOIN clients c ON c.id = s.client_id
         JOIN vehicle_types vt ON vt.id = s.vehicle_type_id
         JOIN vehicle_categories vc ON vc.id = vt.category_id
         JOIN users u ON u.id = s.seller_id
         LEFT JOIN coupons cp ON cp.id = s.coupon_id
+        LEFT JOIN LATERAL (
+            SELECT sc.outcome, sc.at, sc.note, scu.display_name AS by_name
+            FROM sale_contacts sc LEFT JOIN users scu ON scu.id = sc.actor_id
+            WHERE sc.sale_id = s.id ORDER BY sc.at DESC LIMIT 1
+        ) lc ON true
         """;
 
     public static object ToDto(SaleView s) => new
@@ -91,6 +125,16 @@ public static class SaleEndpoints
         s.CreatedAt,
         s.UpdatedAt,
         s.DeliveredAt,
+        s.DeliveryAt,
+        s.ClientAlert,
+        lastContact = s.LastContactOutcome is null ? null : new
+        {
+            outcome = s.LastContactOutcome,
+            at = s.LastContactAt,
+            note = s.LastContactNote,
+            byName = s.LastContactBy,
+        },
+        s.ContactCount,
     };
 
     public static string Ref(long number) => $"BP-{number:0000}";
@@ -143,10 +187,16 @@ public static class SaleEndpoints
                 FROM sale_events e LEFT JOIN users u ON u.id = e.actor_id
                 WHERE e.sale_id = @id ORDER BY e.at, e.id
                 """, new { id });
+            var contacts = await c.QueryAsync<SaleContactView>("""
+                SELECT sc.id, sc.outcome, sc.note, sc.appointment_at, u.display_name AS actor_name, sc.at
+                FROM sale_contacts sc LEFT JOIN users u ON u.id = sc.actor_id
+                WHERE sc.sale_id = @id ORDER BY sc.at DESC
+                """, new { id });
             return Results.Ok(new
             {
                 sale = ToDto(sale),
                 events,
+                contacts,
                 partnerValidations = partnerValidations.Select(v => new
                 {
                     id = (Guid)v.id,
@@ -346,6 +396,64 @@ public static class SaleEndpoints
             http.RefreshTourBoard();
             return Results.Ok(new { id, status = input.To, gift = result.Gift });
         }).RequirePerm(Permissions.SalesView); // les droits précis sont vérifiés selon la transition
+
+        // Suivi des appels au client : facultatif, ne bloque jamais un changement de statut.
+        g.MapPost("/{id:guid}/contacts", async (Guid id, ContactInput input, HttpContext http, NpgsqlDataSource db, AuditService audit, PortalOptions opt) =>
+        {
+            var me = http.Me();
+            if (input.Outcome is null || !ContactOutcome.Labels.ContainsKey(input.Outcome)) return EndpointAuth.Bad("Résultat de l'appel invalide.");
+            var note = string.IsNullOrWhiteSpace(input.Note) ? null : input.Note.Trim();
+            if (note is { Length: > 300 }) return EndpointAuth.Bad("Note : 300 caractères maximum.");
+            DateTime? appointment = null;
+            if (input.Outcome == ContactOutcome.Appointment)
+            {
+                appointment = ParseLocal(input.AppointmentAt, opt);
+                if (!string.IsNullOrWhiteSpace(input.AppointmentAt) && appointment is null) return EndpointAuth.Bad("Heure du rendez-vous invalide.");
+            }
+
+            await using var c = await db.OpenConnectionAsync();
+            await using var tx = await c.BeginTransactionAsync();
+            var sale = await c.QuerySingleOrDefaultAsync<(long Number, string Status)>(
+                "SELECT number, status FROM sales WHERE id = @id FOR UPDATE", new { id }, tx);
+            if (sale.Status is null) return EndpointAuth.NotFound("Vente introuvable.");
+            if (sale.Status is SaleStatus.Delivered or SaleStatus.Cancelled) return EndpointAuth.Bad("Cette vente est terminée.");
+
+            await c.ExecuteAsync("""
+                INSERT INTO sale_contacts (sale_id, outcome, note, appointment_at, actor_id) VALUES (@id, @outcome, @note, @appointment, @actor)
+                """, new { id, outcome = input.Outcome, note, appointment, actor = me.Id == Guid.Empty ? (Guid?)null : me.Id }, tx);
+            if (appointment is not null)
+                await c.ExecuteAsync("UPDATE sales SET delivery_at = @appointment, updated_at = now() WHERE id = @id", new { id, appointment }, tx);
+            await tx.CommitAsync();
+
+            if (appointment is { } at)
+            {
+                await audit.LogAsync(me, "sale.delivery", "sale", id.ToString(), $"Vente {Ref(sale.Number)} : rendez-vous de livraison",
+                    $"RDV pris pour le **{LocalLabel(at, opt)}**" + (note is null ? "" : $"\nNote : {note}"), $"/ventes/{id}");
+                http.RefreshTourBoard();
+            }
+            return Results.Ok(new { ok = true });
+        }).RequirePerm(Permissions.SalesContact);
+
+        // Rendez-vous de livraison saisi ou retiré directement (facultatif).
+        g.MapPut("/{id:guid}/delivery", async (Guid id, DeliveryInput input, HttpContext http, NpgsqlDataSource db, AuditService audit, PortalOptions opt) =>
+        {
+            var me = http.Me();
+            var at = ParseLocal(input.DeliveryAt, opt);
+            if (!string.IsNullOrWhiteSpace(input.DeliveryAt) && at is null) return EndpointAuth.Bad("Heure du rendez-vous invalide.");
+
+            await using var c = await db.OpenConnectionAsync();
+            var sale = await c.QuerySingleOrDefaultAsync<(long Number, string Status, DateTime? Previous)>(
+                "SELECT number, status, delivery_at FROM sales WHERE id = @id", new { id });
+            if (sale.Status is null) return EndpointAuth.NotFound("Vente introuvable.");
+            if (sale.Status is SaleStatus.Delivered or SaleStatus.Cancelled) return EndpointAuth.Bad("Cette vente est terminée.");
+            if (sale.Previous == at) return Results.Ok(new { ok = true });
+
+            await c.ExecuteAsync("UPDATE sales SET delivery_at = @at, updated_at = now() WHERE id = @id", new { id, at });
+            await audit.LogAsync(me, "sale.delivery", "sale", id.ToString(), $"Vente {Ref(sale.Number)} : rendez-vous de livraison",
+                at is { } v ? $"RDV fixé au **{LocalLabel(v, opt)}**" : "Rendez-vous retiré", $"/ventes/{id}");
+            http.RefreshTourBoard();
+            return Results.Ok(new { ok = true });
+        }).RequirePerm(Permissions.SalesContact);
 
         // Actions groupées de la page Tournée (uniquement vers l'avant, sans livraison).
         g.MapPost("/bulk-status", async (BulkStatusInput input, HttpContext http, NpgsqlDataSource db, ConfigService config, AuditService audit) =>

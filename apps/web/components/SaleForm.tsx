@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -17,6 +17,7 @@ export function SaleFormModal({
   onSaved,
   clientId,
   clientData,
+  clientAlert,
   sale,
 }: {
   open: boolean;
@@ -24,6 +25,8 @@ export function SaleFormModal({
   onSaved: (id: string) => void;
   clientId: string;
   clientData: DataRecord;
+  /** Note interne du client marquée « alerte » : affichée en avertissement. */
+  clientAlert?: string | null;
   sale?: Sale;
 }) {
   const { config } = usePortal();
@@ -140,6 +143,14 @@ export function SaleFormModal({
   return (
     <Modal open={open} onClose={onClose} title={sale ? `Modifier ${sale.reference}` : "Nouvel achat"} wide>
       <form onSubmit={submit} className="space-y-5">
+        {clientAlert && (
+          <div className="flex items-start gap-3 rounded-md border border-paulie-red/60 bg-paulie-red/15 px-4 py-3 text-sm text-red-100">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
+            <span className="whitespace-pre-line">
+              <strong>Note interne du client :</strong> {clientAlert}
+            </span>
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <Label htmlFor="vehicle" required>

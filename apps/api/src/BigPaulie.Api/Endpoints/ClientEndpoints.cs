@@ -28,16 +28,29 @@ public static class ClientEndpoints
         public string? UpdatedByName { get; set; }
         public int SaleCount { get; set; }
         public int ActiveSaleCount { get; set; }
+        public string? InternalNote { get; set; }
+        public bool NoteAlert { get; set; }
+        public DateTime? NoteUpdatedAt { get; set; }
+        public string? NoteUpdatedByName { get; set; }
+    }
+
+    public sealed class NoteInput
+    {
+        public string? Text { get; set; }
+        /// <summary>Afficher la note en avertissement au moment d'une vente (et dans la tournée).</summary>
+        public bool Alert { get; set; }
     }
 
     private const string SelectClient = """
         SELECT c.id, c.data::text AS data_json, c.created_at, c.updated_at,
                cu.display_name AS created_by_name, uu.display_name AS updated_by_name,
                (SELECT count(*)::int FROM sales s WHERE s.client_id = c.id) AS sale_count,
-               (SELECT count(*)::int FROM sales s WHERE s.client_id = c.id AND s.status IN ('TO_ORDER','TO_FETCH','RECEIVED')) AS active_sale_count
+               (SELECT count(*)::int FROM sales s WHERE s.client_id = c.id AND s.status IN ('TO_ORDER','TO_FETCH','RECEIVED')) AS active_sale_count,
+               c.internal_note, c.note_alert, c.note_updated_at, nu.display_name AS note_updated_by_name
         FROM clients c
         LEFT JOIN users cu ON cu.id = c.created_by
         LEFT JOIN users uu ON uu.id = c.updated_by
+        LEFT JOIN users nu ON nu.id = c.note_updated_by
         """;
 
     public static string FullName(JsonObject data) =>
@@ -57,6 +70,10 @@ public static class ClientEndpoints
             r.UpdatedByName,
             r.SaleCount,
             r.ActiveSaleCount,
+            r.InternalNote,
+            r.NoteAlert,
+            r.NoteUpdatedAt,
+            r.NoteUpdatedByName,
         };
     }
 
@@ -190,6 +207,28 @@ public static class ClientEndpoints
             if (changed.Count > 0) http.RefreshTourBoard(); // le nom du client apparaît dans le tableau
             return Results.Ok(new { id });
         }).RequirePerm(Permissions.ClientsEdit);
+
+        // Note interne : visible des employés uniquement, jamais envoyée au client.
+        g.MapPut("/{id:guid}/note", async (Guid id, NoteInput input, HttpContext http, NpgsqlDataSource db, AuditService audit) =>
+        {
+            var me = http.Me();
+            var text = string.IsNullOrWhiteSpace(input.Text) ? null : input.Text.Trim();
+            if (text is { Length: > 1000 }) return EndpointAuth.Bad("Note interne : 1000 caractères maximum.");
+            await using var c = await db.OpenConnectionAsync();
+            var json = await c.ExecuteScalarAsync<string?>("""
+                UPDATE clients SET internal_note = @text, note_alert = @alert, note_updated_at = now(), note_updated_by = @me
+                WHERE id = @id AND deleted_at IS NULL
+                RETURNING data::text
+                """, new { id, text, alert = text is not null && input.Alert, me = me.Id == Guid.Empty ? (Guid?)null : me.Id });
+            if (json is null) return EndpointAuth.NotFound("Client introuvable.");
+
+            var name = FullName(FieldValidator.ParseObject(json));
+            await audit.LogAsync(me, "client.note", "client", id.ToString(), $"Note interne : {name}",
+                text is null ? "Note interne effacée." : (input.Alert ? "⚠️ Alerte à la vente\n" : "") + (text.Length > 300 ? text[..300] + "…" : text),
+                $"/clients/{id}");
+            http.RefreshTourBoard();
+            return Results.Ok(new { ok = true });
+        }).RequirePerm(Permissions.ClientsNote);
 
         g.MapDelete("/{id:guid}", async (Guid id, HttpContext http, NpgsqlDataSource db, AuditService audit) =>
         {

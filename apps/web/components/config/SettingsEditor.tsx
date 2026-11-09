@@ -16,6 +16,13 @@ const RECAP_SECTIONS = [
   ["recapVehicles", "Top véhicules"],
   ["recapSellers", "Classement des vendeurs"],
   ["recapClients", "Clients"],
+  ["recapGoals", "Objectifs de la semaine"],
+] as const;
+
+const GOALS = [
+  ["goalSales", "Ventes", "ventes non annulées enregistrées dans la semaine"],
+  ["goalDelivered", "Livraisons", "véhicules passés en « Livré » dans la semaine"],
+  ["goalNewClients", "Nouveaux clients", "fiches clients créées dans la semaine"],
 ] as const;
 
 /** Réglages généraux. « section » choisit la partie affichée (onglets de la configuration), l'enregistrement envoie tout. */
@@ -69,6 +76,7 @@ export function SettingsEditor({
         vehicles: s.recapVehicles,
         sellers: s.recapSellers,
         clients: s.recapClients,
+        goals: s.recapGoals,
       });
       setTestMsg({ ok: true, text: `Récap de test (${formatDate(r.from)} → ${formatDate(r.to)}) envoyé, sans mention.` });
     } catch (e) {
@@ -174,6 +182,30 @@ export function SettingsEditor({
         <p className="mt-3 text-xs text-cream-dim">
           Un véhicule encore « à commander » ou « à chercher » au-delà de ce nombre de tournées est marqué ⏰ dans le tableau, et ce rôle est
           mentionné à chaque tournée tant qu'il reste des véhicules en retard. 0 désactive les retards.
+        </p>
+      </Card>
+
+      <Card title="Objectifs de la semaine">
+        <div className="grid gap-4 sm:grid-cols-3">
+          {GOALS.map(([key, label, hint]) => (
+            <div key={key}>
+              <Label>{label}</Label>
+              <Input
+                type="number"
+                min={0}
+                max={10000}
+                value={s[key] ?? ""}
+                placeholder="aucun"
+                onChange={(e) => set({ [key]: e.target.value === "" ? null : Math.max(0, Math.min(10000, Number(e.target.value) || 0)) } as Partial<PortalSettings>)}
+                className="w-32"
+              />
+              <p className="mt-1 text-xs text-cream-dim">{hint}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-cream-dim">
+          Du lundi au dimanche, en nombre (pas de montant : la marge n&apos;est pas connue). La progression s&apos;affiche sur le tableau de bord et
+          dans le récap hebdomadaire. Vide = pas d&apos;objectif.
         </p>
       </Card>
 
@@ -405,6 +437,52 @@ export function SettingsEditor({
             </div>
           )}
         </div>
+      </Card>
+
+      <Card title="Anniversaires">
+        <Toggle
+          checked={s.birthdayCouponEnabled}
+          onChange={(v) => set({ birthdayCouponEnabled: v })}
+          label="Offrir automatiquement un coupon le jour de l'anniversaire du client"
+        />
+        {s.birthdayCouponEnabled && (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <Label>Promotion</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={s.couponMaxPercent}
+                  value={s.birthdayPercent}
+                  onChange={(e) => set({ birthdayPercent: Math.max(1, Number(e.target.value) || 1) })}
+                  className="w-24"
+                />
+                <span className="text-sm text-cream-muted">%</span>
+              </div>
+            </div>
+            <div>
+              <Label>Valable</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={s.birthdayExpiryDays ?? ""}
+                  placeholder="∞"
+                  onChange={(e) => set({ birthdayExpiryDays: e.target.value === "" ? null : Math.max(1, Number(e.target.value) || 1) })}
+                  className="w-24"
+                />
+                <span className="text-sm text-cream-muted">jours (vide = sans expiration)</span>
+              </div>
+            </div>
+          </div>
+        )}
+        <p className="mt-3 text-xs text-cream-dim">
+          Selon la date de naissance de la fiche client (29 février → 28 février les autres années). Un coupon par client et par an, créé le jour J
+          (heure de Paris) et annoncé dans le salon de logs. Les anniversaires des 7 prochains jours s&apos;affichent sur le tableau de bord, que le
+          coupon soit activé ou non.
+        </p>
       </Card>
 
       <Card title="Cadeaux à la livraison">

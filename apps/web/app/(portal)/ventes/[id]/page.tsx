@@ -1,17 +1,19 @@
 "use client";
 
-import { AlertTriangle, ArrowLeft, ArrowRight, Ban, Check, Gift, Pencil, RotateCcw, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Ban, Check, Gift, Pencil, PhoneCall, RotateCcw, ShieldAlert, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { FieldDisplay } from "@/components/DynamicFields";
+import { PhoneCopy } from "@/components/PhoneCopy";
 import { SaleFormModal } from "@/components/SaleForm";
+import { ContactDialog, ContactHistory, DeliveryBadge, DeliveryEditor } from "@/components/SaleFollowUp";
 import { ImmediateBadge, StatusBadge } from "@/components/StatusBadge";
 import { Badge, Button, Card, ErrorBox, Input, Label, Modal, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
-import { cn, formatDateTime, formatMoney, formatPhone } from "@/lib/format";
+import { cn, formatDateTime, formatMoney } from "@/lib/format";
 import { giftFor, PERM, useCan, usePortal, useStatus } from "@/lib/portal-context";
-import { STATUS_FLOW, type Client, type Sale, type SaleEvent, type SalePartnerValidation, type StatusCode } from "@/lib/types";
+import { STATUS_FLOW, type Client, type Sale, type SaleContact, type SaleEvent, type SalePartnerValidation, type StatusCode } from "@/lib/types";
 
 export default function SalePage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +23,8 @@ export default function SalePage() {
   const [sale, setSale] = useState<Sale | null>(null);
   const [events, setEvents] = useState<SaleEvent[]>([]);
   const [partnerValidations, setPartnerValidations] = useState<SalePartnerValidation[]>([]);
+  const [contacts, setContacts] = useState<SaleContact[]>([]);
+  const [contactOpen, setContactOpen] = useState(false);
   const [client, setClient] = useState<Client | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,7 +35,10 @@ export default function SalePage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await api.get<{ sale: Sale; events: SaleEvent[]; partnerValidations: SalePartnerValidation[] }>(`/api/sales/${id}`);
+      const res = await api.get<{ sale: Sale; events: SaleEvent[]; partnerValidations: SalePartnerValidation[]; contacts: SaleContact[] }>(
+        `/api/sales/${id}`,
+      );
+      setContacts(res.contacts ?? []);
       setSale(res.sale);
       setEvents(res.events);
       setPartnerValidations(res.partnerValidations ?? []);
@@ -65,6 +72,7 @@ export default function SalePage() {
   if (!sale) return <Spinner />;
 
   const cancelled = sale.status === "CANCELLED";
+  const active = sale.status !== "CANCELLED" && sale.status !== "DELIVERED";
   const rank = STATUS_FLOW.indexOf(sale.status);
   const next = !cancelled && rank < STATUS_FLOW.length - 1 ? STATUS_FLOW[rank + 1] : null;
   const prev = !cancelled && rank > 0 ? STATUS_FLOW[rank - 1] : null;
@@ -103,6 +111,7 @@ export default function SalePage() {
             <span className="font-mono text-sand">{sale.reference}</span>· {sale.vehicleTypeLabel} · {sale.categoryLabel}
             <StatusBadge status={sale.status} />
             {sale.immediate && <ImmediateBadge />}
+            {sale.deliveryAt && sale.status === "RECEIVED" && <DeliveryBadge at={sale.deliveryAt} />}
             {!sale.catalogVehicleId && <Badge color="#7C8A99">Hors catalogue</Badge>}
           </span>
         }
@@ -181,6 +190,14 @@ export default function SalePage() {
 
       <div className="grid gap-6 lg:grid-cols-5">
         <Card title="Détails" className="lg:col-span-3">
+          {sale.clientAlert && (
+            <div className="mb-4 flex items-start gap-3 rounded-md border border-paulie-red/60 bg-paulie-red/15 px-4 py-3 text-sm text-red-100">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
+              <span className="whitespace-pre-line">
+                <strong>Note interne du client :</strong> {sale.clientAlert}
+              </span>
+            </div>
+          )}
           {sale.permitWarning && (
             <div className="mb-4 flex items-start gap-3 rounded-md border border-sand/50 bg-sand/10 px-4 py-3 text-sm text-amber-100">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-sand" />
@@ -194,7 +211,11 @@ export default function SalePage() {
               <Link href={`/clients/${sale.clientId}`} className="text-sand hover:underline">
                 {sale.clientName}
               </Link>
-              {sale.clientPhone && <div className="text-sm text-cream-muted">{formatPhone(sale.clientPhone)}</div>}
+              {sale.clientPhone && (
+                <div>
+                  <PhoneCopy phone={sale.clientPhone} className="text-sm" />
+                </div>
+              )}
             </Info>
             <Info label="Prix de vente">{formatMoney(sale.price)}</Info>
             <Info label="Type">
@@ -288,12 +309,57 @@ export default function SalePage() {
         </Card>
       </div>
 
+      {(active || contacts.length > 0) && (
+        <Card
+          title="Appels & rendez-vous"
+          className="mt-6"
+          actions={
+            active &&
+            can(PERM.salesContact) && (
+              <Button size="sm" variant="secondary" onClick={() => setContactOpen(true)}>
+                <PhoneCall className="h-4 w-4" /> Noter un appel
+              </Button>
+            )
+          }
+        >
+          <div className="grid gap-6 md:grid-cols-2">
+            <div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-cream-muted">Rendez-vous de livraison</div>
+              {active && can(PERM.salesContact) ? (
+                <DeliveryEditor sale={sale} onSaved={load} />
+              ) : sale.deliveryAt ? (
+                <span>{formatDateTime(sale.deliveryAt)}</span>
+              ) : (
+                <span className="text-sm text-cream-dim">Aucun</span>
+              )}
+              <p className="mt-2 text-xs text-cream-dim">Facultatif. Les rendez-vous passent en tête de la colonne « à livrer » de la tournée.</p>
+            </div>
+            <div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-cream-muted">Appels ({contacts.length})</div>
+              <ContactHistory contacts={contacts} />
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {contactOpen && (
+        <ContactDialog
+          sale={sale}
+          onClose={() => setContactOpen(false)}
+          onSaved={async () => {
+            setContactOpen(false);
+            await load();
+          }}
+        />
+      )}
+
       {editOpen && (
         <SaleFormModal
           open
           sale={sale}
           clientId={sale.clientId}
           clientData={client?.data ?? {}}
+          clientAlert={sale.clientAlert}
           onClose={() => setEditOpen(false)}
           onSaved={async () => {
             setEditOpen(false);

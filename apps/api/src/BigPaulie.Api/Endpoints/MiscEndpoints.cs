@@ -56,7 +56,7 @@ public static class MiscEndpoints
         }).RequirePerm(Permissions.SalesAdvance);
 
         // ---------- Dashboard ----------
-        app.MapGet("/api/dashboard", async (NpgsqlDataSource db) =>
+        app.MapGet("/api/dashboard", async (NpgsqlDataSource db, ConfigService config, ClientCareService care, StatsService stats, HttpContext http) =>
         {
             await using var c = await db.OpenConnectionAsync();
             var counts = (await c.QueryAsync<(string Status, int Count)>("""
@@ -68,7 +68,20 @@ public static class MiscEndpoints
                 "SELECT count(*)::int FROM sales WHERE permit_warning AND status IN ('TO_ORDER','TO_FETCH','RECEIVED')");
             var immediate = await c.ExecuteScalarAsync<int>(
                 "SELECT count(*)::int FROM sales WHERE immediate AND status IN ('TO_ORDER','TO_FETCH')");
-            return Results.Ok(new { counts, permitWarnings = warnings, immediatePending = immediate });
+            // Objectifs de la semaine en cours (lundi → dimanche).
+            var settings = await config.GetSettingsAsync();
+            var monday = RecapService.Monday(stats.TodayLocal());
+            var goals = await care.GoalsAsync(settings, monday, monday.AddDays(6));
+            var birthdays = http.Me().Has(Permissions.ClientsView) ? await care.UpcomingBirthdaysAsync(7) : new List<BirthdayInfo>();
+            return Results.Ok(new
+            {
+                counts,
+                permitWarnings = warnings,
+                immediatePending = immediate,
+                goals = new { from = StatsService.Ymd(monday), to = StatsService.Ymd(monday.AddDays(6)), items = goals },
+                birthdays,
+                birthdayCoupon = settings.BirthdayCouponEnabled,
+            });
         }).RequirePerm(Permissions.SalesView);
 
         // ---------- Fichiers (images de permis collées) ----------

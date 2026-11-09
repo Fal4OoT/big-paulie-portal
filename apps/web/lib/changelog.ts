@@ -18,6 +18,22 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.14.0",
+    date: "2026-11-09",
+    title: "Suivi client",
+    changes: [
+      { kind: "nouveau", text: "Appels : dans la tournée (📞) et sur la fiche vente, on note « pas de réponse », « message laissé », « client joint » ou « RDV pris ». Le dernier appel s'affiche sous le véhicule. Facultatif, ne bloque jamais le passage en « Livré »." },
+      { kind: "nouveau", text: "Rendez-vous de livraison facultatif : affiché dans la tournée et le tableau Discord (🕘 RDV 21h30), les rendez-vous passent en tête de la colonne « à livrer »." },
+      { kind: "nouveau", text: "Note interne sur la fiche client, avec option « Alerte » : avertissement rouge à chaque achat, sur la fiche vente et dans la tournée." },
+      { kind: "nouveau", text: "Anniversaires des 7 prochains jours sur le tableau de bord, et coupon d'anniversaire automatique (à activer dans Avantages clients)." },
+      { kind: "nouveau", text: "Analyse → Clients à relancer : clients sans achat depuis X semaines, les plus gros acheteurs d'abord, numéro copiable." },
+      { kind: "nouveau", text: "Objectifs de la semaine (ventes, livraisons, nouveaux clients) : progression sur le tableau de bord et dans le récap Discord." },
+      { kind: "amélioration", text: "Parrainage : le parrain peut être changé ou retiré tant que le filleul n'a pas acheté ; le Patron (permission dédiée) peut le faire à tout moment." },
+      { kind: "amélioration", text: "Numéro du client copiable sur la fiche vente, les anniversaires et les clients à relancer." },
+      { kind: "nouveau", text: "Sauvegarde automatique de la base toutes les 30 minutes, conservée 14 jours (script deploy/backup.sh)." },
+    ],
+  },
+  {
     version: "1.13.1",
     date: "2026-11-09",
     title: "Numéro du client dans la tournée",

@@ -166,6 +166,7 @@ function CouponItem({ coupon: c, onCancel }: { coupon: Coupon; onCancel?: () => 
         <Badge color={st.color}>{st.label}</Badge>
         {c.source === "LOYALTY" && <Badge color="#D9A441">Fidélité</Badge>}
         {c.source === "REFERRAL" && <Badge color="#E07A2F">Parrainage</Badge>}
+        {c.source === "BIRTHDAY" && <Badge color="#B5568F">🎂 Anniversaire</Badge>}
         <span className="text-xs text-cream-muted">{c.expiresOn ? `Expire le ${formatDate(c.expiresOn)}` : "Sans expiration"}</span>
         {onCancel && (
           <button onClick={onCancel} className="ml-auto rounded p-1 text-cream-dim hover:bg-paulie-red/20 hover:text-red-300" title="Annuler le coupon">

@@ -56,6 +56,13 @@ public static partial class ConfigEndpoints
         public bool RecapVehicles { get; set; } = true;
         public bool RecapSellers { get; set; } = true;
         public bool RecapClients { get; set; } = true;
+        public bool RecapGoals { get; set; } = true;
+        public int? GoalSales { get; set; }
+        public int? GoalDelivered { get; set; }
+        public int? GoalNewClients { get; set; }
+        public bool BirthdayCouponEnabled { get; set; }
+        public int BirthdayPercent { get; set; } = 10;
+        public int? BirthdayExpiryDays { get; set; } = 30;
     }
 
     public sealed class RecapTestInput
@@ -67,6 +74,7 @@ public static partial class ConfigEndpoints
         public bool Vehicles { get; set; } = true;
         public bool Sellers { get; set; } = true;
         public bool Clients { get; set; } = true;
+        public bool Goals { get; set; } = true;
     }
 
     private sealed class MemberRow
@@ -141,7 +149,7 @@ public static partial class ConfigEndpoints
             var channel = input.ChannelId?.Trim();
             if (string.IsNullOrEmpty(channel) || !SnowflakeRegex().IsMatch(channel)) return EndpointAuth.Bad("Choisis d'abord le salon du récap.");
             var (from, to) = RecapService.Week(input.Week, stats.TodayLocal());
-            var (_, text) = await recap.BuildAsync(from, to, new RecapOptions(input.Amounts, input.Compare, input.Vehicles, input.Sellers, input.Clients));
+            var (_, text) = await recap.BuildAsync(from, to, new RecapOptions(input.Amounts, input.Compare, input.Vehicles, input.Sellers, input.Clients, input.Goals));
             if (!await RecapService.SendAsync(discord, channel, null, text, ct))
                 return EndpointAuth.Bad("Discord a refusé l'envoi : vérifie que le bot peut voir le salon et y écrire.");
             await audit.LogAsync(http.Me(), "config.recap_test", "config", null, "Récap de test envoyé",
@@ -440,6 +448,20 @@ public static partial class ConfigEndpoints
             s.RecapVehicles = input.RecapVehicles;
             s.RecapSellers = input.RecapSellers;
             s.RecapClients = input.RecapClients;
+            s.RecapGoals = input.RecapGoals;
+
+            foreach (var (label, value) in new[] { ("ventes", input.GoalSales), ("livraisons", input.GoalDelivered), ("nouveaux clients", input.GoalNewClients) })
+                if (value is < 0 or > 10_000) return EndpointAuth.Bad($"Objectif {label} : entre 0 et 10 000 (vide = pas d'objectif).");
+            s.GoalSales = input.GoalSales is > 0 ? input.GoalSales : null;
+            s.GoalDelivered = input.GoalDelivered is > 0 ? input.GoalDelivered : null;
+            s.GoalNewClients = input.GoalNewClients is > 0 ? input.GoalNewClients : null;
+
+            if (input.BirthdayPercent < 1 || input.BirthdayPercent > input.CouponMaxPercent)
+                return EndpointAuth.Bad($"Anniversaire : le pourcentage doit être entre 1 et {input.CouponMaxPercent} %.");
+            if (input.BirthdayExpiryDays is < 1 or > 365) return EndpointAuth.Bad("Anniversaire : validité entre 1 et 365 jours (vide = sans expiration).");
+            s.BirthdayCouponEnabled = input.BirthdayCouponEnabled;
+            s.BirthdayPercent = input.BirthdayPercent;
+            s.BirthdayExpiryDays = input.BirthdayExpiryDays;
 
             await config.SaveSettingsAsync(s);
             http.RefreshTourBoard(); // salon, libellés ou seuil de retard ont pu changer

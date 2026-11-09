@@ -1,11 +1,13 @@
 "use client";
 
-import { AlertTriangle, Check, Clock, Megaphone, PackageCheck, Phone, ShoppingCart, Zap } from "lucide-react";
+import { AlertTriangle, Clock, Megaphone, PackageCheck, PhoneCall, ShieldAlert, ShoppingCart, Zap } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { PhoneCopy } from "@/components/PhoneCopy";
+import { ContactDialog, DeliveryBadge, LastContact } from "@/components/SaleFollowUp";
 import { Button, Empty, ErrorBox, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
-import { cn, formatPhone } from "@/lib/format";
+import { cn } from "@/lib/format";
 import { PERM, useCan, useStatus } from "@/lib/portal-context";
 import type { Sale, StatusCode, TourData } from "@/lib/types";
 
@@ -18,6 +20,7 @@ export default function TourPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [contactSale, setContactSale] = useState<Sale | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -81,6 +84,11 @@ export default function TourPage() {
   const mm = Math.floor(remaining / 60000);
   const ss = Math.floor((remaining % 60000) / 1000);
   const canAdvance = can(PERM.salesAdvance);
+  const canContact = can(PERM.salesContact);
+  // À livrer : les rendez-vous d'abord, par heure.
+  const received = [...tour.received].sort((a, b) =>
+    a.deliveryAt && b.deliveryAt ? a.deliveryAt.localeCompare(b.deliveryAt) : a.deliveryAt ? -1 : b.deliveryAt ? 1 : 0,
+  );
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -161,10 +169,22 @@ export default function TourPage() {
         <Column
           code="RECEIVED"
           icon={<PackageCheck className="h-5 w-5" />}
-          sales={tour.received}
-          hint="Ouvre la vente pour la livrer et renseigner la plaque."
+          sales={received}
+          hint={`Ouvre la vente pour la livrer et renseigner la plaque.${canContact ? " 📞 pour noter un appel ou un RDV (facultatif)." : ""}`}
+          onContact={canContact ? setContactSale : undefined}
         />
       </div>
+
+      {contactSale && (
+        <ContactDialog
+          sale={contactSale}
+          onClose={() => setContactSale(null)}
+          onSaved={async () => {
+            setContactSale(null);
+            await load();
+          }}
+        />
+      )}
     </>
   );
 }
@@ -179,6 +199,7 @@ function Column({
   onSelectAll,
   action,
   hint,
+  onContact,
 }: {
   code: StatusCode;
   icon: ReactNode;
@@ -189,6 +210,7 @@ function Column({
   onSelectAll?: (ids: string[]) => void;
   action?: ReactNode;
   hint?: string;
+  onContact?: (sale: Sale) => void;
 }) {
   const s = useStatus()(code);
   return (
@@ -233,46 +255,34 @@ function Column({
                   </Link>
                   {sale.immediate && <Zap className="h-3.5 w-3.5 text-sunset" aria-label="Immédiat" />}
                   {sale.permitWarning && <AlertTriangle className="h-3.5 w-3.5 text-sand" aria-label="Permis manquant" />}
+                  {sale.clientAlert && (
+                    <span title={`Note interne : ${sale.clientAlert}`}>
+                      <ShieldAlert className="h-3.5 w-3.5 text-red-300" aria-label="Alerte client" />
+                    </span>
+                  )}
+                  {sale.deliveryAt && <DeliveryBadge at={sale.deliveryAt} />}
                 </div>
                 <div className="truncate text-xs text-cream-muted">
                   <span className="font-mono text-sand">{sale.reference}</span> · {sale.vehicleTypeLabel} · {sale.clientName}
                 </div>
-                {sale.clientPhone && <PhoneCopy phone={sale.clientPhone} />}
+                {sale.clientPhone && <PhoneCopy phone={sale.clientPhone} className="mt-0.5" />}
+                <LastContact sale={sale} className="mt-0.5" />
               </div>
+              {onContact && (
+                <button
+                  type="button"
+                  onClick={() => onContact(sale)}
+                  title="Noter un appel ou un rendez-vous"
+                  className="rounded p-1.5 text-cream-dim transition-colors hover:bg-night-700 hover:text-sand"
+                >
+                  <PhoneCall className="h-4 w-4" />
+                </button>
+              )}
             </div>
           ))
         )}
       </div>
       {action && <footer className="border-t border-night-500/70 p-3">{action}</footer>}
     </section>
-  );
-}
-
-/** Numéro du client : clic = copie des 10 chiffres (à composer en jeu). */
-function PhoneCopy({ phone }: { phone: string }) {
-  const [copied, setCopied] = useState(false);
-  const digits = phone.replace(/\D/g, "");
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(digits || phone);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* presse-papiers indisponible : le numéro reste lisible */
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={copy}
-      title="Copier le numéro"
-      className="mt-0.5 inline-flex items-center gap-1 text-xs tabular-nums text-cream transition-colors hover:text-sand"
-    >
-      {copied ? <Check className="h-3 w-3 text-emerald-300" /> : <Phone className="h-3 w-3 text-cream-dim" />}
-      {formatPhone(phone)}
-      {copied && <span className="text-emerald-300">copié</span>}
-    </button>
   );
 }

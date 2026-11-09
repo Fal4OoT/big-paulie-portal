@@ -32,9 +32,10 @@ interface Options {
   vehicles: boolean;
   clients: boolean;
   compare: boolean;
+  goals: boolean;
 }
 
-const DEFAULT_OPTIONS: Options = { amounts: true, sellers: true, vehicles: true, clients: true, compare: true };
+const DEFAULT_OPTIONS: Options = { amounts: true, sellers: true, vehicles: true, clients: true, compare: true, goals: true };
 const OPTIONS_KEY = "bp.recapOptions";
 const DISCORD_LIMIT = 2000;
 
@@ -115,6 +116,7 @@ export function WeeklyRecapModal({ open, onClose, current }: { open: boolean; on
     { key: "vehicles", label: "Top véhicules" },
     { key: "sellers", label: "Classement des vendeurs" },
     { key: "clients", label: "Clients" },
+    { key: "goals", label: "Objectifs (semaine)" },
   ];
   const length = text?.length ?? 0;
   const tooLong = length > DISCORD_LIMIT;

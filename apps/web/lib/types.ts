@@ -46,7 +46,7 @@ export interface Coupon {
   percent: number;
   reason: string;
   expiresOn: string | null;
-  source: "MANUAL" | "LOYALTY" | "REFERRAL";
+  source: "MANUAL" | "LOYALTY" | "REFERRAL" | "BIRTHDAY";
   sourceSaleId: string | null;
   sourceSaleReference: string | null;
   createdByName: string | null;
@@ -84,6 +84,9 @@ export interface ClientReferral {
   sponsorSetByName: string | null;
   purchases: number;
   canSetSponsor: boolean;
+  /** Changer ou retirer le parrain (avant le premier achat, ou à tout moment avec la permission dédiée). */
+  canChangeSponsor: boolean;
+  afterPurchase: boolean;
   lockReason: string | null;
   godchildren: { id: string; name: string; since: string | null; purchases: number; sponsorRewarded: boolean }[];
   maxGodchildren: number | null;
@@ -312,6 +315,11 @@ export interface Client {
   updatedByName: string | null;
   saleCount: number;
   activeSaleCount: number;
+  internalNote: string | null;
+  /** Note affichée en avertissement au moment d'une vente. */
+  noteAlert: boolean;
+  noteUpdatedAt: string | null;
+  noteUpdatedByName: string | null;
 }
 
 export interface Duplicate {
@@ -354,6 +362,56 @@ export interface Sale {
   createdAt: string;
   updatedAt: string;
   deliveredAt: string | null;
+  /** Rendez-vous de livraison convenu (facultatif). */
+  deliveryAt: string | null;
+  /** Note interne du client marquée « alerte ». */
+  clientAlert: string | null;
+  lastContact: { outcome: ContactOutcome; at: string; note: string | null; byName: string | null } | null;
+  contactCount: number;
+}
+
+export type ContactOutcome = "NO_ANSWER" | "MESSAGE" | "REACHED" | "APPOINTMENT";
+
+export const CONTACT_LABELS: Record<ContactOutcome, string> = {
+  NO_ANSWER: "Pas de réponse",
+  MESSAGE: "Message laissé",
+  REACHED: "Client joint",
+  APPOINTMENT: "RDV pris",
+};
+
+export interface SaleContact {
+  id: string;
+  outcome: ContactOutcome;
+  note: string | null;
+  appointmentAt: string | null;
+  actorName: string | null;
+  at: string;
+}
+
+export interface GoalProgress {
+  key: string;
+  label: string;
+  target: number;
+  current: number;
+}
+
+export interface BirthdayInfo {
+  id: string;
+  name: string;
+  phone: string | null;
+  date: string;
+  daysUntil: number;
+  age: number | null;
+  coupon: string | null;
+}
+
+export interface InactiveClient {
+  id: string;
+  name: string;
+  phone: string | null;
+  purchases: number;
+  total: number;
+  lastPurchaseAt: string;
 }
 
 export interface SalePartnerValidation {
@@ -421,6 +479,13 @@ export interface PortalSettings {
   recapVehicles: boolean;
   recapSellers: boolean;
   recapClients: boolean;
+  recapGoals: boolean;
+  goalSales: number | null;
+  goalDelivered: number | null;
+  goalNewClients: number | null;
+  birthdayCouponEnabled: boolean;
+  birthdayPercent: number;
+  birthdayExpiryDays: number | null;
 }
 
 export interface AdminConfig {

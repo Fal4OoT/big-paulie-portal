@@ -3,11 +3,12 @@
 import { MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Empty, ErrorBox, Input, PageHeader, Spinner } from "@/components/ui";
+import { PhoneCopy } from "@/components/PhoneCopy";
+import { Button, Card, Empty, ErrorBox, Input, PageHeader, Select, Spinner } from "@/components/ui";
 import { WeeklyRecapModal } from "@/components/WeeklyRecap";
 import { api } from "@/lib/api";
-import { cn, formatDate, formatMoney } from "@/lib/format";
-import type { StatsData, StatsGroup } from "@/lib/types";
+import { cn, formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import type { InactiveClient, StatsData, StatsGroup } from "@/lib/types";
 
 type Preset = "7" | "30" | "90" | "custom";
 
@@ -161,7 +162,109 @@ export default function AnalysePage() {
           </Card>
         </div>
       )}
+
+      <InactiveSection />
     </>
+  );
+}
+
+const INACTIVE_KEY = "bp.inactiveWeeks";
+
+/** Clients à relancer : déjà acheteurs, sans nouvel achat (ni commande en cours) depuis X semaines. Indépendant de la période. */
+function InactiveSection() {
+  const [weeks, setWeeks] = useState(4);
+  const [rows, setRows] = useState<InactiveClient[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = Number(localStorage.getItem(INACTIVE_KEY));
+      if (saved >= 1 && saved <= 104) setWeeks(saved);
+    } catch {
+      /* valeur par défaut */
+    }
+  }, []);
+
+  useEffect(() => {
+    setRows(null);
+    setError(null);
+    api
+      .get<InactiveClient[]>(`/api/stats/inactive?weeks=${weeks}`)
+      .then(setRows)
+      .catch((e) => setError(e instanceof Error ? e.message : "Chargement impossible."));
+  }, [weeks]);
+
+  function change(v: number) {
+    setWeeks(v);
+    try {
+      localStorage.setItem(INACTIVE_KEY, String(v));
+    } catch {
+      /* sans importance */
+    }
+  }
+
+  return (
+    <Card
+      title="Clients à relancer"
+      className="mt-6"
+      actions={
+        <span className="flex items-center gap-2 text-sm text-cream-muted">
+          sans achat depuis
+          <Select value={weeks} onChange={(e) => change(Number(e.target.value))} className="w-36">
+            {[2, 4, 6, 8, 12, 26].map((w) => (
+              <option key={w} value={w}>
+                {w} semaines
+              </option>
+            ))}
+          </Select>
+        </span>
+      }
+    >
+      <ErrorBox message={error} />
+      {!rows ? (
+        !error && <Spinner />
+      ) : rows.length === 0 ? (
+        <Empty>Aucun client à relancer sur cette durée. 👌</Empty>
+      ) : (
+        <>
+          <p className="mb-3 text-xs text-cream-dim">
+            Clients qui ont déjà acheté, sans nouvel achat ni commande en cours depuis {weeks} semaines. Les plus gros acheteurs d&apos;abord : une
+            liste d&apos;appels toute prête pour les moments calmes.
+          </p>
+          <div className="-mx-5 overflow-x-auto">
+            <table className="table-bp min-w-[640px]">
+              <thead>
+                <tr>
+                  <th className="pl-5">Client</th>
+                  <th>Téléphone</th>
+                  <th className="text-right">Achats</th>
+                  <th className="text-right">Total dépensé</th>
+                  <th className="pr-5">Dernier achat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td className="pl-5">
+                      <Link href={`/clients/${r.id}`} className="font-medium hover:underline">
+                        {r.name}
+                      </Link>
+                    </td>
+                    <td>{r.phone ? <PhoneCopy phone={r.phone} /> : <span className="text-cream-dim">—</span>}</td>
+                    <td className="text-right tabular-nums">{r.purchases}</td>
+                    <td className="text-right tabular-nums">{formatMoney(r.total)}</td>
+                    <td className="pr-5 text-xs text-cream-muted">
+                      {formatDateTime(r.lastPurchaseAt).slice(0, 10)} · il y a {Math.floor((Date.now() - new Date(r.lastPurchaseAt).getTime()) / 86_400_000)} j
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {rows.length >= 100 && <p className="mt-3 text-xs text-cream-dim">Affichage des 100 premiers.</p>}
+        </>
+      )}
+    </Card>
   );
 }
 

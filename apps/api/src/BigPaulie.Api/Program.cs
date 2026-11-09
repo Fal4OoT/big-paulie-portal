@@ -53,6 +53,7 @@ builder.Services.AddSingleton<ConfigService>();
 builder.Services.AddSingleton<TourService>();
 builder.Services.AddSingleton<TourBoardService>();
 builder.Services.AddSingleton<StatsService>();
+builder.Services.AddSingleton<ClientCareService>();
 builder.Services.AddSingleton<RecapService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<TourBoardService>());
 builder.Services.AddScoped<CurrentUserService>();
@@ -60,6 +61,7 @@ builder.Services.AddScoped<AuditService>();
 builder.Services.AddHostedService<DiscordSenderService>();
 builder.Services.AddHostedService<TourSchedulerService>();
 builder.Services.AddHostedService<WeeklyRecapService>();
+builder.Services.AddHostedService<BirthdayCouponService>();
 
 var app = builder.Build();
 

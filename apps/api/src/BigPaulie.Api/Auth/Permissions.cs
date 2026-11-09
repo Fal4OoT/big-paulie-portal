@@ -16,6 +16,9 @@ public static class Permissions
     public const string CouponsCreate = "coupons.create";
     public const string CouponsCancel = "coupons.cancel";
     public const string ReferralsManage = "referrals.manage";
+    public const string ReferralsOverride = "referrals.override";
+    public const string ClientsNote = "clients.note";
+    public const string SalesContact = "sales.contact";
     public const string TourView = "tour.view";
     public const string StatsView = "stats.view";
     public const string PartnersView = "partners.view";
@@ -44,6 +47,9 @@ public static class Permissions
         new(CouponsCreate, "Attribuer un coupon de promotion", "Ventes"),
         new(CouponsCancel, "Annuler un coupon de promotion", "Ventes"),
         new(ReferralsManage, "Enregistrer un parrainage", "Clients"),
+        new(ReferralsOverride, "Modifier un parrainage à tout moment (même après achat)", "Clients"),
+        new(ClientsNote, "Écrire la note interne d'un client", "Clients"),
+        new(SalesContact, "Noter un appel / un rendez-vous de livraison", "Ventes"),
         new(TourView, "Voir la tournée", "Logistique"),
         new(StatsView, "Voir l'analyse des ventes", "Logistique"),
         new(PartnersView, "Voir les partenariats (contrats, customisations)", "Partenariat"),

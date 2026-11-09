@@ -9,9 +9,9 @@ using Npgsql;
 namespace BigPaulie.Api.Services;
 
 /// <summary>Sections du récap à afficher.</summary>
-public sealed record RecapOptions(bool Amounts = true, bool Compare = true, bool Vehicles = true, bool Sellers = true, bool Clients = true)
+public sealed record RecapOptions(bool Amounts = true, bool Compare = true, bool Vehicles = true, bool Sellers = true, bool Clients = true, bool Goals = true)
 {
-    public static RecapOptions From(PortalSettings s) => new(s.RecapAmounts, s.RecapCompare, s.RecapVehicles, s.RecapSellers, s.RecapClients);
+    public static RecapOptions From(PortalSettings s) => new(s.RecapAmounts, s.RecapCompare, s.RecapVehicles, s.RecapSellers, s.RecapClients, s.RecapGoals);
 }
 
 /// <summary>Dernier envoi automatique (clé « weekly_recap » de la table settings).</summary>
@@ -35,11 +35,15 @@ public sealed class RecapService
 
     private readonly StatsService _stats;
     private readonly NpgsqlDataSource _db;
+    private readonly ClientCareService _care;
+    private readonly ConfigService _config;
 
-    public RecapService(StatsService stats, NpgsqlDataSource db)
+    public RecapService(StatsService stats, NpgsqlDataSource db, ClientCareService care, ConfigService config)
     {
         _stats = stats;
         _db = db;
+        _care = care;
+        _config = config;
     }
 
     // ---------- Périodes ----------
@@ -66,10 +70,17 @@ public sealed class RecapService
             var n = to.DayNumber - from.DayNumber + 1;
             prev = await _stats.ComputeAsync(from.AddDays(-n), from.AddDays(-1));
         }
-        return (cur, Build(cur, prev, o));
+        // Objectifs : seulement pour une semaine commençant un lundi.
+        List<GoalProgress>? goals = null;
+        if (o.Goals && from == Monday(from) && to.DayNumber - from.DayNumber <= 6)
+        {
+            var settings = await _config.GetSettingsAsync();
+            if (ClientCareService.HasGoals(settings)) goals = await _care.GoalsAsync(settings, from, to);
+        }
+        return (cur, Build(cur, prev, o, goals));
     }
 
-    public static string Build(StatsResult cur, StatsResult? prev, RecapOptions o)
+    public static string Build(StatsResult cur, StatsResult? prev, RecapOptions o, List<GoalProgress>? goals = null)
     {
         var t = cur.Totals;
         string Cmp(decimal now, decimal before) => o.Compare && prev is not null ? Evolution(now, before) : "";
@@ -122,6 +133,17 @@ public sealed class RecapService
             L($"• **{Pl(k.NewClients, "nouveau client enregistré", "nouveaux clients enregistrés")}**{Cmp(k.NewClients, prev?.Clients.NewClients ?? 0)}");
             L($"• **{Pl(k.Buyers, "client acheteur", "clients acheteurs")}** : {k.FirstTimeBuyers} premier achat · {k.ReturningBuyers} déjà clients");
             if (k.RepeatBuyers > 0) L(k.RepeatBuyers > 1 ? $"• {k.RepeatBuyers} clients ont acheté plusieurs fois 🔁" : "• 1 client a acheté plusieurs fois 🔁");
+            L();
+        }
+
+        if (goals is { Count: > 0 })
+        {
+            L("## 🎯 Objectifs de la semaine");
+            foreach (var g in goals)
+            {
+                var pct = (int)Math.Round(100.0 * g.Current / g.Target);
+                L($"{(g.Current >= g.Target ? "✅" : "▫️")} {g.Label} : **{g.Current} / {g.Target}** ({pct} %)");
+            }
             L();
         }
 

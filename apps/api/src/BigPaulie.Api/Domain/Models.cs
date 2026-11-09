@@ -143,6 +143,18 @@ public sealed class PortalSettings
     public bool RecapVehicles { get; set; } = true;
     public bool RecapSellers { get; set; } = true;
     public bool RecapClients { get; set; } = true;
+    /// <summary>Afficher la progression des objectifs dans le récap (période d'une semaine commençant un lundi).</summary>
+    public bool RecapGoals { get; set; } = true;
+
+    /// <summary>Objectifs de la semaine (lundi → dimanche), en nombre. null ou 0 = pas d'objectif.</summary>
+    public int? GoalSales { get; set; }
+    public int? GoalDelivered { get; set; }
+    public int? GoalNewClients { get; set; }
+
+    /// <summary>Coupon offert automatiquement le jour de l'anniversaire du client.</summary>
+    public bool BirthdayCouponEnabled { get; set; }
+    public int BirthdayPercent { get; set; } = 10;
+    public int? BirthdayExpiryDays { get; set; } = 30;
 
     public string StatusLabel(string code) =>
         Statuses.FirstOrDefault(s => s.Code == code)?.Label ?? code;
@@ -199,6 +211,42 @@ public sealed class SaleView
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? DeliveredAt { get; set; }
+    /// <summary>Rendez-vous de livraison convenu avec le client (facultatif).</summary>
+    public DateTime? DeliveryAt { get; set; }
+    /// <summary>Note interne du client quand elle est marquée « alerte ».</summary>
+    public string? ClientAlert { get; set; }
+    public string? LastContactOutcome { get; set; }
+    public DateTime? LastContactAt { get; set; }
+    public string? LastContactNote { get; set; }
+    public string? LastContactBy { get; set; }
+    public int ContactCount { get; set; }
+}
+
+public sealed class SaleContactView
+{
+    public Guid Id { get; set; }
+    public string Outcome { get; set; } = "";
+    public string? Note { get; set; }
+    public DateTime? AppointmentAt { get; set; }
+    public string? ActorName { get; set; }
+    public DateTime At { get; set; }
+}
+
+/// <summary>Résultats possibles d'un appel au client.</summary>
+public static class ContactOutcome
+{
+    public const string NoAnswer = "NO_ANSWER";
+    public const string Message = "MESSAGE";
+    public const string Reached = "REACHED";
+    public const string Appointment = "APPOINTMENT";
+
+    public static readonly Dictionary<string, string> Labels = new()
+    {
+        [NoAnswer] = "Pas de réponse",
+        [Message] = "Message laissé",
+        [Reached] = "Client joint",
+        [Appointment] = "RDV pris",
+    };
 }
 
 public sealed class SaleEventView

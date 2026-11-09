@@ -3,6 +3,18 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.14.0 — 09/11/2026 · Suivi client
+
+- **Nouveau** : suivi des appels sur les ventes (tournée 📞 et fiche vente) : pas de réponse, message laissé, client joint, RDV pris. Facultatif, sans effet sur les statuts. Permission « Noter un appel / un rendez-vous de livraison » (`sales.contact`), donnée aux grades qui font avancer les statuts.
+- **Nouveau** : rendez-vous de livraison facultatif (`sales.delivery_at`), affiché dans la tournée et le tableau Discord, trié en tête des véhicules à livrer.
+- **Nouveau** : note interne client avec alerte à la vente (`clients.note`, donnée aux grades qui modifient les clients).
+- **Nouveau** : anniversaires des 7 prochains jours sur le tableau de bord ; coupon d'anniversaire automatique facultatif (Avantages clients), un par client et par an, annoncé dans les logs.
+- **Nouveau** : Analyse → Clients à relancer (`/api/stats/inactive`).
+- **Nouveau** : objectifs de la semaine en nombre (ventes, livraisons, nouveaux clients) sur le tableau de bord et dans le récap.
+- **Amélioration** : parrainage modifiable avant le premier achat du filleul ; à tout moment avec `referrals.override` (donnée au grade Patron). Après achat : coupon du filleul inchangé, coupon non utilisé de l'ancien parrain annulé, pas de coupon automatique pour le nouveau.
+- **Nouveau** : `deploy/backup.sh` : sauvegarde toutes les 30 min via cron (`--installer`), gardée 14 jours, sans copie si rien n'a changé, `--liste`, `--restaurer`.
+- **Base** : migration `010_followup` (permissions, `sale_contacts`, note interne, coupons `BIRTHDAY`, fiche du guide « Suivi client »).
+
 ## v1.13.1 — 09/11/2026 · Numéro du client dans la tournée
 
 - **Amélioration** : vue Tournée, le téléphone du client est affiché sur chaque véhicule ; un clic copie les 10 chiffres.

@@ -67,14 +67,30 @@ public static class ReferralEndpoints
         return CouponService.Ref(cp.Number);
     }
 
-    public sealed record AssignResult(IResult? Error, string? Label = null, string GodchildName = "", string SponsorName = "", string? ReplacedCoupon = null);
+    /// <summary>Annule le coupon non utilisé de l'ancien parrain (parrainage modifié après le premier achat du filleul).</summary>
+    private static async Task<string?> CancelSponsorCouponAsync(NpgsqlConnection c, NpgsqlTransaction tx, Guid godchildId, Guid actorId, string reason)
+    {
+        var cp = await c.QuerySingleOrDefaultAsync<(Guid Id, long Number)>("""
+            UPDATE coupons SET cancelled_at = now(), cancelled_by = @actor, cancel_reason = @reason
+            WHERE source = 'REFERRAL' AND referral_role = 'SPONSOR' AND referral_godchild_id = @godchildId
+              AND used_sale_id IS NULL AND cancelled_at IS NULL
+            RETURNING id, number
+            """, new { godchildId, actor = actorId == Guid.Empty ? (Guid?)null : actorId, reason }, tx);
+        if (cp.Id == Guid.Empty) return null;
+        await CouponService.EventAsync(c, tx, cp.Id, "CANCELLED", null, reason, actorId);
+        return CouponService.Ref(cp.Number);
+    }
+
+    public sealed record AssignResult(IResult? Error, string? Label = null, string GodchildName = "", string SponsorName = "",
+        string? ReplacedCoupon = null, string? PreviousSponsorName = null, bool AfterPurchase = false);
 
     /// <summary>
     /// Enregistre le parrain d'un client, dans la transaction de l'appelant (aussi utilisé à la création du client).
     /// Crée le coupon du filleul. En cas d'erreur, l'appelant ne valide pas la transaction.
     /// </summary>
+    /// <param name="canOverride">Permission « Modifier un parrainage à tout moment » : autorise le changement après le premier achat du filleul.</param>
     public static async Task<AssignResult> AssignSponsorAsync(NpgsqlConnection c, NpgsqlTransaction tx, PortalSettings settings,
-        Guid id, Guid sponsorId, Guid actorId, DateOnly today)
+        Guid id, Guid sponsorId, Guid actorId, DateOnly today, bool canOverride = false)
     {
         if (!settings.ReferralEnabled) return new(EndpointAuth.Bad("Le parrainage n'est pas activé (Configuration → Coupons & fidélité)."));
         if (sponsorId == id) return new(EndpointAuth.Bad("Un client ne peut pas être son propre parrain."));
@@ -87,8 +103,11 @@ public static class ReferralEndpoints
         if (sponsorJson is null) return new(EndpointAuth.Bad("Le parrain doit être un client enregistré."));
         if (godchild.SponsorId == sponsorId) return new(EndpointAuth.Bad("Ce client a déjà ce parrain."));
 
-        if (await c.ExecuteScalarAsync<int>(PurchasesSql, new { id }, tx) > 0)
-            return new(EndpointAuth.Bad("Le parrainage doit être enregistré avant le premier achat du filleul."));
+        var afterPurchase = await c.ExecuteScalarAsync<int>(PurchasesSql, new { id }, tx) > 0;
+        if (afterPurchase && !canOverride)
+            return new(EndpointAuth.Bad(godchild.SponsorId is null
+                ? "Le parrainage doit être enregistré avant le premier achat du filleul."
+                : "Le filleul a déjà acheté : seul un grade avec la permission « Modifier un parrainage à tout moment » peut changer son parrain."));
 
         // Aucun parrainage croisé, même en chaîne (A → B → C → A).
         var cycle = await c.ExecuteScalarAsync<bool>("""
@@ -109,32 +128,47 @@ public static class ReferralEndpoints
         }
 
         string? replacedCoupon = null;
-        if (godchild.SponsorId is not null)
+        string? previousSponsorName = null;
+        if (godchild.SponsorId is { } previous)
         {
-            if (await LockReasonAsync(c, tx, id) is { } locked) return new(EndpointAuth.Conflict(locked));
-            replacedCoupon = await CancelGodchildCouponAsync(c, tx, id, actorId, "Parrain changé");
+            previousSponsorName = CouponService.FullName(await c.ExecuteScalarAsync<string?>(
+                "SELECT data::text FROM clients WHERE id = @previous", new { previous }, tx) ?? "{}");
+            if (afterPurchase)
+                // Le coupon du filleul a déjà pu servir : on n'y touche pas. L'ancien parrain perd son coupon s'il ne l'a pas utilisé.
+                replacedCoupon = await CancelSponsorCouponAsync(c, tx, id, actorId, "Parrain changé");
+            else
+            {
+                if (await LockReasonAsync(c, tx, id) is { } locked) return new(EndpointAuth.Conflict(locked));
+                replacedCoupon = await CancelGodchildCouponAsync(c, tx, id, actorId, "Parrain changé");
+            }
         }
 
         await c.ExecuteAsync("UPDATE clients SET sponsor_id = @sid, sponsor_set_at = now(), sponsor_set_by = @me WHERE id = @id",
             new { sid = sponsorId, me = actorId == Guid.Empty ? (Guid?)null : actorId, id }, tx);
 
         var sponsorName = CouponService.FullName(sponsorJson);
-        var label = await CouponService.CreateReferralCouponAsync(c, tx, settings, id, id, "GODCHILD", settings.ReferralGodchildPercent,
+        // Après le premier achat, plus aucun coupon de parrainage n'est généré (il ne servirait plus).
+        var label = afterPurchase ? null : await CouponService.CreateReferralCouponAsync(c, tx, settings, id, id, "GODCHILD", settings.ReferralGodchildPercent,
             $"Parrainage : filleul de {sponsorName}", null, actorId, today);
-        return new(null, label, CouponService.FullName(godchild.DataJson), sponsorName, replacedCoupon);
+        return new(null, label, CouponService.FullName(godchild.DataJson), sponsorName, replacedCoupon, previousSponsorName, afterPurchase);
     }
 
     public static Task LogAssignedAsync(AuditService audit, CurrentUser me, Guid id, AssignResult r) =>
-        audit.LogAsync(me, "referral.created", "client", id.ToString(), "Parrainage enregistré",
-            $"**{r.GodchildName}** est parrainé(e) par **{r.SponsorName}**.\n🏷️ Coupon filleul : **{r.Label}**" +
-            "\nLe parrain recevra son coupon au premier achat du filleul." +
+        audit.LogAsync(me, r.PreviousSponsorName is null ? "referral.created" : "referral.changed", "client", id.ToString(),
+            r.PreviousSponsorName is null ? "Parrainage enregistré" : "Parrainage modifié",
+            $"**{r.GodchildName}** est parrainé(e) par **{r.SponsorName}**" +
+            (r.PreviousSponsorName is null ? "." : $" (auparavant **{r.PreviousSponsorName}**).") +
+            (r.AfterPurchase
+                ? "\nModifié après le premier achat du filleul : aucun nouveau coupon de parrainage."
+                : $"\n🏷️ Coupon filleul : **{r.Label}**\nLe parrain recevra son coupon au premier achat du filleul.") +
             (r.ReplacedCoupon is null ? "" : $"\nAncien coupon {r.ReplacedCoupon} annulé (parrain changé)."),
             $"/clients/{id}");
 
     public static void MapReferrals(this WebApplication app)
     {
-        app.MapGet("/api/clients/{id:guid}/referral", async (Guid id, NpgsqlDataSource db, ConfigService config) =>
+        app.MapGet("/api/clients/{id:guid}/referral", async (Guid id, HttpContext http, NpgsqlDataSource db, ConfigService config) =>
         {
+            var canOverride = http.Me().Has(Permissions.ReferralsOverride);
             var settings = await config.GetSettingsAsync();
             await using var c = await db.OpenConnectionAsync();
             var row = await c.QuerySingleOrDefaultAsync<ReferralRow>("""
@@ -156,7 +190,9 @@ public static class ReferralEndpoints
                 ORDER BY g.sponsor_set_at
                 """, new { id });
             var purchases = await c.ExecuteScalarAsync<int>(PurchasesSql, new { id });
-            var lockReason = row.SponsorId is null ? null : await LockReasonAsync(c, null, id);
+            var lockReason = row.SponsorId is null || purchases > 0 ? null : await LockReasonAsync(c, null, id);
+            if (row.SponsorId is not null && purchases > 0 && !canOverride)
+                lockReason = "Le filleul a déjà acheté : seul le Patron (permission « Modifier un parrainage à tout moment ») peut changer son parrain.";
 
             return Results.Ok(new
             {
@@ -167,7 +203,9 @@ public static class ReferralEndpoints
                 sponsorSetAt = row.SponsorSetAt,
                 sponsorSetByName = row.SponsorSetByName,
                 purchases,
-                canSetSponsor = settings.ReferralEnabled && row.SponsorId is null && purchases == 0,
+                canSetSponsor = settings.ReferralEnabled && row.SponsorId is null && (purchases == 0 || canOverride),
+                canChangeSponsor = settings.ReferralEnabled && row.SponsorId is not null && lockReason is null,
+                afterPurchase = purchases > 0,
                 lockReason,
                 godchildren = godchildren.Select(g => new
                 {
@@ -191,7 +229,7 @@ public static class ReferralEndpoints
             await using var c = await db.OpenConnectionAsync();
             await using var tx = await c.BeginTransactionAsync();
 
-            var r = await AssignSponsorAsync(c, tx, settings, id, input.SponsorId, me.Id, CouponService.Today(opt));
+            var r = await AssignSponsorAsync(c, tx, settings, id, input.SponsorId, me.Id, CouponService.Today(opt), me.Has(Permissions.ReferralsOverride));
             if (r.Error is not null) return r.Error; // la transaction est annulée
             await tx.CommitAsync();
 
@@ -210,15 +248,25 @@ public static class ReferralEndpoints
                 FOR UPDATE OF cl
                 """, new { id }, tx);
             if (row.DataJson is null) return EndpointAuth.NotFound("Ce client n'a pas de parrain.");
-            if (await LockReasonAsync(c, tx, id) is { } locked) return EndpointAuth.Conflict(locked);
-
-            var cancelled = await CancelGodchildCouponAsync(c, tx, id, me.Id, "Parrainage retiré");
+            var afterPurchase = await c.ExecuteScalarAsync<int>(PurchasesSql, new { id }, tx) > 0;
+            string? cancelled;
+            if (afterPurchase)
+            {
+                if (!me.Has(Permissions.ReferralsOverride))
+                    return EndpointAuth.Conflict("Le filleul a déjà acheté : seul le Patron (permission « Modifier un parrainage à tout moment ») peut retirer son parrain.");
+                cancelled = await CancelSponsorCouponAsync(c, tx, id, me.Id, "Parrainage retiré");
+            }
+            else
+            {
+                if (await LockReasonAsync(c, tx, id) is { } locked) return EndpointAuth.Conflict(locked);
+                cancelled = await CancelGodchildCouponAsync(c, tx, id, me.Id, "Parrainage retiré");
+            }
             await c.ExecuteAsync("UPDATE clients SET sponsor_id = NULL, sponsor_set_at = NULL, sponsor_set_by = NULL WHERE id = @id", new { id }, tx);
             await tx.CommitAsync();
 
             await audit.LogAsync(me, "referral.deleted", "client", id.ToString(), "Parrainage retiré",
                 $"**{CouponService.FullName(row.DataJson)}** n'est plus parrainé(e) par **{CouponService.FullName(row.SponsorJson ?? "{}")}**." +
-                (cancelled is null ? "" : $"\nCoupon filleul {cancelled} annulé."),
+                (cancelled is null ? "" : $"\nCoupon {cancelled} annulé."),
                 $"/clients/{id}");
             return Results.Ok(new { ok = true });
         }).RequirePerm(Permissions.ReferralsManage);

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock, Handshake, Search, Trash2, UserPlus } from "lucide-react";
+import { Check, Clock, Handshake, Pencil, Search, Trash2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -30,7 +30,11 @@ export function ClientReferral({ clientId, onChanged }: { clientId: string; onCh
   }, [load]);
 
   async function remove() {
-    if (!data?.sponsor || !confirm(`Retirer le parrain ${data.sponsor.name} ? Le coupon de parrainage du filleul sera annulé.`)) return;
+    if (!data?.sponsor) return;
+    const effect = data.afterPurchase
+      ? "Le coupon de l'ancien parrain sera annulé s'il ne l'a pas encore utilisé."
+      : "Le coupon de parrainage du filleul sera annulé.";
+    if (!confirm(`Retirer le parrain ${data.sponsor.name} ? ${effect}`)) return;
     setBusy(true);
     setError(null);
     try {
@@ -67,10 +71,15 @@ export function ClientReferral({ clientId, onChanged }: { clientId: string; onCh
                     {data.sponsor.name}
                   </Link>
                 </span>
-                {manage && !data.lockReason && (
-                  <button onClick={remove} disabled={busy} className="ml-auto rounded p-1 text-cream-dim hover:bg-paulie-red/20 hover:text-red-300" title="Retirer le parrain">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                {manage && data.canChangeSponsor && (
+                  <span className="ml-auto flex gap-1">
+                    <button onClick={() => setPickerOpen(true)} disabled={busy} className="rounded p-1 text-cream-dim hover:bg-night-700 hover:text-cream" title="Changer de parrain">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button onClick={remove} disabled={busy} className="rounded p-1 text-cream-dim hover:bg-paulie-red/20 hover:text-red-300" title="Retirer le parrain">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </span>
                 )}
               </div>
               <div className="mt-1 text-xs text-cream-dim">
@@ -86,8 +95,9 @@ export function ClientReferral({ clientId, onChanged }: { clientId: string; onCh
                   <UserPlus className="h-4 w-4" /> Enregistrer un parrain
                 </Button>
                 <p className="mt-2 text-xs text-cream-dim">
-                  Le filleul reçoit un coupon de {data.godchildPercent} % utilisable dès son premier achat ; le parrain reçoit {data.sponsorPercent} % une
-                  fois ce premier achat enregistré.
+                  {data.afterPurchase
+                    ? "Ce client a déjà acheté : le parrain sera enregistré sans générer de coupon de parrainage."
+                    : `Le filleul reçoit un coupon de ${data.godchildPercent} % utilisable dès son premier achat ; le parrain reçoit ${data.sponsorPercent} % une fois ce premier achat enregistré.`}
                 </p>
               </div>
             ) : (
@@ -138,6 +148,8 @@ export function ClientReferral({ clientId, onChanged }: { clientId: string; onCh
       {pickerOpen && (
         <SponsorPicker
           clientId={clientId}
+          change={!!data.sponsor}
+          afterPurchase={data.afterPurchase}
           onClose={() => setPickerOpen(false)}
           onSaved={async () => {
             setPickerOpen(false);
@@ -150,7 +162,19 @@ export function ClientReferral({ clientId, onChanged }: { clientId: string; onCh
   );
 }
 
-function SponsorPicker({ clientId, onClose, onSaved }: { clientId: string; onClose: () => void; onSaved: () => void }) {
+function SponsorPicker({
+  clientId,
+  change,
+  afterPurchase,
+  onClose,
+  onSaved,
+}: {
+  clientId: string;
+  change: boolean;
+  afterPurchase: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Client[] | null>(null);
   const [selected, setSelected] = useState<Client | null>(null);
@@ -186,8 +210,15 @@ function SponsorPicker({ clientId, onClose, onSaved }: { clientId: string; onClo
   }
 
   return (
-    <Modal open onClose={onClose} title="Enregistrer un parrain">
+    <Modal open onClose={onClose} title={change ? "Changer de parrain" : "Enregistrer un parrain"}>
       <div className="space-y-4">
+        {change && (
+          <p className="text-xs text-cream-dim">
+            {afterPurchase
+              ? "Le filleul a déjà acheté : son coupon reste tel quel, l'ancien parrain perd son coupon s'il ne l'a pas utilisé, et le nouveau parrain ne reçoit pas de coupon automatique."
+              : "Le coupon actuel du filleul est annulé et un nouveau est créé au nom du nouveau parrain."}
+          </p>
+        )}
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cream-dim" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher le parrain : nom, prénom, téléphone…" className="pl-9" autoFocus />

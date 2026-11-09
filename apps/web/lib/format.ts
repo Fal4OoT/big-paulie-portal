@@ -51,3 +51,39 @@ export function formatPhone(p: string | null | undefined): string {
 export function cn(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
 }
+
+/** Instant ISO → valeur d'un champ datetime-local en heure de Paris (« 2026-11-09T21:30 »). */
+export function toParisInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const get = (t: string) => parts.find((x) => x.type === t)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+/** Prochaine demi-heure à Paris, au format datetime-local. */
+export function nextHalfHourInput(): string {
+  const d = new Date(Date.now() + 30 * 60_000);
+  d.setUTCMinutes(d.getUTCMinutes() < 30 ? 30 : 60, 0, 0);
+  return toParisInput(d.toISOString());
+}
+
+/** Rendez-vous : « 21h30 » aujourd'hui, « demain 21h30 », sinon « 12/11 21h30 ». */
+export function formatAppointment(iso: string): string {
+  const v = toParisInput(iso);
+  const today = toParisInput(new Date().toISOString()).slice(0, 10);
+  const tomorrow = toParisInput(new Date(Date.now() + 86_400_000).toISOString()).slice(0, 10);
+  const hour = `${v.slice(11, 13)}h${v.slice(14, 16)}`;
+  const day = v.slice(0, 10);
+  if (day === today) return hour;
+  if (day === tomorrow) return `demain ${hour}`;
+  return `${day.slice(8, 10)}/${day.slice(5, 7)} ${hour}`;
+}
+

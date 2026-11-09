@@ -70,10 +70,20 @@ public sealed class TourService
     public static string Line(SaleView s) =>
         $"{(s.Immediate ? "⚡ " : "")}**{SaleEndpoints.Ref(s.Number)}** · {s.VehicleName} ({s.VehicleTypeLabel}) — {s.ClientName}";
 
-    private static string Line(SaleView s, PortalSettings settings, DateTime nowUtc)
+    private string Line(SaleView s, PortalSettings settings, DateTime nowUtc)
     {
-        if (!IsLate(s, settings, nowUtc)) return Line(s);
-        return $"⏰ {Line(s)} · *{ToursWaited(s.CreatedAt, nowUtc)} tournées*";
+        var line = Line(s);
+        if (s.Status == SaleStatus.Received && s.DeliveryAt is { } at) line += $" · 🕘 RDV {Appointment(at, nowUtc)}";
+        if (!IsLate(s, settings, nowUtc)) return line;
+        return $"⏰ {line} · *{ToursWaited(s.CreatedAt, nowUtc)} tournées*";
+    }
+
+    /// <summary>« 21h30 » le jour même, sinon « 12/11 21h30 ».</summary>
+    public string Appointment(DateTime utc, DateTime nowUtc)
+    {
+        var local = TimeZoneInfo.ConvertTimeFromUtc(utc, _tz);
+        var today = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, _tz).Date;
+        return local.Date == today ? local.ToString("HH'h'mm") : local.ToString("dd/MM HH'h'mm");
     }
 
     public sealed record BoardData(List<SaleView> ToOrder, List<SaleView> ToFetch, List<SaleView> Received, List<SaleView> Late)
@@ -87,7 +97,9 @@ public sealed class TourService
         return new BoardData(
             pending.Where(s => s.Status == SaleStatus.ToOrder).ToList(),
             pending.Where(s => s.Status == SaleStatus.ToFetch).ToList(),
-            pending.Where(s => s.Status == SaleStatus.Received).ToList(),
+            // À livrer : les rendez-vous d'abord (par heure), puis le reste.
+            pending.Where(s => s.Status == SaleStatus.Received)
+                   .OrderBy(s => s.DeliveryAt is null).ThenBy(s => s.DeliveryAt).ThenByDescending(s => s.Immediate).ThenBy(s => s.CreatedAt).ToList(),
             pending.Where(s => IsLate(s, settings, nowUtc)).ToList());
     }
 
@@ -118,7 +130,7 @@ public sealed class TourService
         };
     }
 
-    private static object Field(string name, List<SaleView> sales, PortalSettings settings, DateTime nowUtc) => new
+    private object Field(string name, List<SaleView> sales, PortalSettings settings, DateTime nowUtc) => new
     {
         Name = name,
         Value = DiscordNotifier.BulletList(sales.Select(s => Line(s, settings, nowUtc)).ToList()),

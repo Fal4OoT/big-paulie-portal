@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ClientCoupons } from "@/components/ClientCoupons";
 import { ClientForm } from "@/components/ClientForm";
+import { ClientNote } from "@/components/ClientNote";
 import { ClientReferral } from "@/components/ClientReferral";
 import { FieldDisplay } from "@/components/DynamicFields";
 import { ImagePaste } from "@/components/ImagePaste";
@@ -146,6 +147,8 @@ export default function ClientPage() {
             </Card>
           )}
 
+          <ClientNote client={client} onSaved={load} />
+
           <ClientReferral clientId={client.id} onChanged={() => setCouponsKey((k) => k + 1)} />
 
           <ClientCoupons clientId={client.id} reloadKey={couponsKey} />
@@ -165,6 +168,7 @@ export default function ClientPage() {
           onSaved={(saleId) => router.push(`/ventes/${saleId}`)}
           clientId={client.id}
           clientData={client.data}
+          clientAlert={client.noteAlert ? client.internalNote : null}
         />
       )}
     </>
