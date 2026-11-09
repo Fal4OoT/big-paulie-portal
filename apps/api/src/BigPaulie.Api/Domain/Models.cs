@@ -129,6 +129,21 @@ public sealed class PortalSettings
                    .Select(x => x.t).FirstOrDefault();
     public List<StatusSetting> Statuses { get; set; } = new();
 
+    /// <summary>Récap hebdomadaire envoyé automatiquement dans un salon Discord.</summary>
+    public bool RecapEnabled { get; set; }
+    public string? RecapChannelId { get; set; }
+    public string? RecapPingRoleId { get; set; }
+    /// <summary>Jour d'envoi : 1 = lundi … 7 = dimanche (heure de Paris).</summary>
+    public int RecapDay { get; set; } = 1;
+    public int RecapHour { get; set; } = 10;
+    /// <summary>« previous » = semaine dernière complète, « current » = semaine en cours jusqu'au jour d'envoi.</summary>
+    public string RecapWeek { get; set; } = "previous";
+    public bool RecapAmounts { get; set; } = true;
+    public bool RecapCompare { get; set; } = true;
+    public bool RecapVehicles { get; set; } = true;
+    public bool RecapSellers { get; set; } = true;
+    public bool RecapClients { get; set; } = true;
+
     public string StatusLabel(string code) =>
         Statuses.FirstOrDefault(s => s.Code == code)?.Label ?? code;
 }

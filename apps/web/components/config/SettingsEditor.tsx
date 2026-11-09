@@ -2,10 +2,21 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { usePortal } from "@/lib/portal-context";
 import type { AdminConfig, GiftTier, PortalSettings } from "@/lib/types";
 import { Badge, Button, Card, Input, Label, Select, Toggle } from "../ui";
 import { SaveBar, stableJson } from "./SaveBar";
+
+const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+
+const RECAP_SECTIONS = [
+  ["recapAmounts", "Montants en $"],
+  ["recapCompare", "Comparaison avec la semaine précédente"],
+  ["recapVehicles", "Top véhicules"],
+  ["recapSellers", "Classement des vendeurs"],
+  ["recapClients", "Clients"],
+] as const;
 
 /** Réglages généraux. « section » choisit la partie affichée (onglets de la configuration), l'enregistrement envoie tout. */
 export function SettingsEditor({
@@ -40,6 +51,30 @@ export function SettingsEditor({
       setError(e instanceof Error ? e.message : "Enregistrement impossible.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function sendTest() {
+    setTesting(true);
+    setTestMsg(null);
+    try {
+      const r = await api.post<{ from: string; to: string }>("/api/admin/recap/test", {
+        channelId: s.recapChannelId,
+        week: s.recapWeek,
+        amounts: s.recapAmounts,
+        compare: s.recapCompare,
+        vehicles: s.recapVehicles,
+        sellers: s.recapSellers,
+        clients: s.recapClients,
+      });
+      setTestMsg({ ok: true, text: `Récap de test (${formatDate(r.from)} → ${formatDate(r.to)}) envoyé, sans mention.` });
+    } catch (e) {
+      setTestMsg({ ok: false, text: e instanceof Error ? e.message : "Envoi impossible." });
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -140,6 +175,80 @@ export function SettingsEditor({
           Un véhicule encore « à commander » ou « à chercher » au-delà de ce nombre de tournées est marqué ⏰ dans le tableau, et ce rôle est
           mentionné à chaque tournée tant qu'il reste des véhicules en retard. 0 désactive les retards.
         </p>
+      </Card>
+
+      <Card title="Récap hebdomadaire">
+        <div className="space-y-4">
+          <Toggle checked={s.recapEnabled} onChange={(v) => set({ recapEnabled: v })} label="Envoyer automatiquement le récap des ventes chaque semaine" />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <Label>Salon</Label>
+              {channelSelect(s.recapChannelId, (v) => set({ recapChannelId: v }))}
+            </div>
+            <div>
+              <Label>Rôle mentionné</Label>
+              {roleSelect(s.recapPingRoleId, (v) => set({ recapPingRoleId: v }))}
+            </div>
+            <div>
+              <Label>Envoi le</Label>
+              <div className="flex items-center gap-2">
+                <Select value={s.recapDay} onChange={(e) => set({ recapDay: Number(e.target.value) })}>
+                  {DAYS.map((d, i) => (
+                    <option key={d} value={i + 1}>
+                      {d}
+                    </option>
+                  ))}
+                </Select>
+                <span className="text-sm text-cream-muted">à</span>
+                <Select value={s.recapHour} onChange={(e) => set({ recapHour: Number(e.target.value) })} className="w-24">
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>
+                      {String(h).padStart(2, "0")}h00
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Période couverte</Label>
+              <Select value={s.recapWeek} onChange={(e) => set({ recapWeek: e.target.value === "current" ? "current" : "previous" })}>
+                <option value="previous">Semaine dernière (lundi → dimanche)</option>
+                <option value="current">Semaine en cours (lundi → jour d'envoi)</option>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            {RECAP_SECTIONS.map(([key, label]) => (
+              <label key={key} className="flex cursor-pointer items-center gap-2">
+                <input type="checkbox" checked={s[key]} onChange={() => set({ [key]: !s[key] } as Partial<PortalSettings>)} className="h-4 w-4 accent-[#D9A441]" />
+                {label}
+              </label>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" size="sm" variant="secondary" loading={testing} disabled={!s.recapChannelId} onClick={sendTest}>
+              Envoyer un test maintenant
+            </Button>
+            {testMsg && <span className={testMsg.ok ? "text-sm text-emerald-300" : "text-sm text-red-300"}>{testMsg.text}</span>}
+          </div>
+
+          <div className="space-y-1 text-xs text-cream-dim">
+            <p>
+              Heure de Paris. Même message que le bouton « Récap Discord » d&apos;Analyse. Si le portail était arrêté à l&apos;heure prévue, le récap
+              part dès son redémarrage (jusqu&apos;à 24 h après). Un seul envoi automatique par semaine. Le test utilise les réglages affichés, même non
+              enregistrés, sans mentionner le rôle.
+            </p>
+            {admin.recapStatus.lastSentAt && (
+              <p>
+                Dernier envoi : {formatDateTime(admin.recapStatus.lastSentAt)}
+                {admin.recapStatus.lastFrom && admin.recapStatus.lastTo && ` (ventes du ${formatDate(admin.recapStatus.lastFrom)} au ${formatDate(admin.recapStatus.lastTo)})`}.
+              </p>
+            )}
+            {admin.recapStatus.nextAt && !dirty && <p>Prochain envoi : {formatDateTime(admin.recapStatus.nextAt)}.</p>}
+          </div>
+        </div>
       </Card>
 
       </>

@@ -409,11 +409,24 @@ export interface PortalSettings {
   giftsEnabled: boolean;
   giftTiers: GiftTier[];
   statuses: StatusSetting[];
+  recapEnabled: boolean;
+  recapChannelId: string | null;
+  recapPingRoleId: string | null;
+  /** 1 = lundi … 7 = dimanche. */
+  recapDay: number;
+  recapHour: number;
+  recapWeek: "previous" | "current";
+  recapAmounts: boolean;
+  recapCompare: boolean;
+  recapVehicles: boolean;
+  recapSellers: boolean;
+  recapClients: boolean;
 }
 
 export interface AdminConfig {
   grades: Grade[];
   settings: PortalSettings;
+  recapStatus: { lastSentAt: string | null; lastFrom: string | null; lastTo: string | null; nextAt: string | null };
   discordRoles: { id: string; name: string; color: string | null }[];
   discordChannels: { id: string; name: string }[];
   discordError: string | null;

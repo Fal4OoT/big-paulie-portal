@@ -18,6 +18,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.13.0",
+    date: "2026-11-09",
+    title: "Récap hebdomadaire automatique",
+    changes: [
+      { kind: "nouveau", text: "Configuration → Discord : le récap des ventes peut être envoyé automatiquement chaque semaine dans un salon, au jour et à l'heure choisis (heure de Paris), avec un rôle mentionné et les sections au choix. Bouton « Envoyer un test maintenant »." },
+      { kind: "amélioration", text: "Le bouton « Récap Discord » d'Analyse et l'envoi automatique produisent exactement le même message (généré par le serveur)." },
+    ],
+  },
+  {
     version: "1.12.0",
     date: "2026-11-09",
     title: "Récap Discord",

@@ -45,6 +45,28 @@ public static partial class ConfigEndpoints
         public bool GiftsEnabled { get; set; }
         public List<GiftTier>? GiftTiers { get; set; }
         public List<StatusSetting>? Statuses { get; set; }
+        public bool RecapEnabled { get; set; }
+        public string? RecapChannelId { get; set; }
+        public string? RecapPingRoleId { get; set; }
+        public int RecapDay { get; set; } = 1;
+        public int RecapHour { get; set; } = 10;
+        public string? RecapWeek { get; set; }
+        public bool RecapAmounts { get; set; } = true;
+        public bool RecapCompare { get; set; } = true;
+        public bool RecapVehicles { get; set; } = true;
+        public bool RecapSellers { get; set; } = true;
+        public bool RecapClients { get; set; } = true;
+    }
+
+    public sealed class RecapTestInput
+    {
+        public string? ChannelId { get; set; }
+        public string? Week { get; set; }
+        public bool Amounts { get; set; } = true;
+        public bool Compare { get; set; } = true;
+        public bool Vehicles { get; set; } = true;
+        public bool Sellers { get; set; } = true;
+        public bool Clients { get; set; } = true;
     }
 
     private sealed class MemberRow
@@ -83,7 +105,7 @@ public static partial class ConfigEndpoints
 
         var g = app.MapGroup("/api/admin").RequirePerm(Permissions.ConfigManage);
 
-        g.MapGet("/config", async (ConfigService config, DiscordRestClient discord, ILoggerFactory lf) =>
+        g.MapGet("/config", async (ConfigService config, RecapService recap, DiscordRestClient discord, ILoggerFactory lf) =>
         {
             object roles = Array.Empty<object>();
             object channels = Array.Empty<object>();
@@ -99,14 +121,32 @@ public static partial class ConfigEndpoints
                 discordError = "Impossible de lire les rôles et salons du serveur Discord (vérifie le token du bot et DISCORD_GUILD_ID).";
             }
 
+            var settings = await config.GetSettingsAsync();
+            var recapState = await recap.GetStateAsync();
             return Results.Ok(new
             {
                 grades = await config.GetGradesAsync(),
-                settings = await config.GetSettingsAsync(),
+                settings,
+                recapStatus = new { lastSentAt = recapState.SentAt, lastFrom = recapState.From, lastTo = recapState.To, nextAt = recap.NextRunUtc(settings, recapState) },
                 discordRoles = roles,
                 discordChannels = channels,
                 discordError,
             });
+        });
+
+        // Envoi de test du récap avec les réglages en cours d'édition (sans mention, ne compte pas comme l'envoi de la semaine).
+        g.MapPost("/recap/test", async (RecapTestInput input, HttpContext http, StatsService stats, RecapService recap,
+            DiscordRestClient discord, AuditService audit, CancellationToken ct) =>
+        {
+            var channel = input.ChannelId?.Trim();
+            if (string.IsNullOrEmpty(channel) || !SnowflakeRegex().IsMatch(channel)) return EndpointAuth.Bad("Choisis d'abord le salon du récap.");
+            var (from, to) = RecapService.Week(input.Week, stats.TodayLocal());
+            var (_, text) = await recap.BuildAsync(from, to, new RecapOptions(input.Amounts, input.Compare, input.Vehicles, input.Sellers, input.Clients));
+            if (!await RecapService.SendAsync(discord, channel, null, text, ct))
+                return EndpointAuth.Bad("Discord a refusé l'envoi : vérifie que le bot peut voir le salon et y écrire.");
+            await audit.LogAsync(http.Me(), "config.recap_test", "config", null, "Récap de test envoyé",
+                $"Récap du {from:dd/MM} au {to:dd/MM} envoyé en test.");
+            return Results.Ok(new { ok = true, from = StatsService.Ymd(from), to = StatsService.Ymd(to) });
         });
 
         g.MapGet("/members", async (NpgsqlDataSource db, ConfigService config, CurrentUserService users) =>
@@ -314,7 +354,8 @@ public static partial class ConfigEndpoints
             var s = await config.GetSettingsAsync();
             foreach (var (label, value) in new[] { ("Salon de logs", input.LogChannelId), ("Salon de tournée", input.TourChannelId),
                          ("Rôle à mentionner (tournée)", input.TourPingRoleId), ("Rôle à mentionner (immédiat)", input.ImmediatePingRoleId),
-                         ("Rôle à mentionner (retards)", input.TourLateRoleId) })
+                         ("Rôle à mentionner (retards)", input.TourLateRoleId), ("Salon du récap", input.RecapChannelId),
+                         ("Rôle à mentionner (récap)", input.RecapPingRoleId) })
                 if (Snow(value) is { } v && !SnowflakeRegex().IsMatch(v)) return EndpointAuth.Bad($"{label} : identifiant invalide.");
 
             s.LogChannelId = Snow(input.LogChannelId);
@@ -384,6 +425,21 @@ public static partial class ConfigEndpoints
                     target.Color = st.Color!;
                 }
             }
+
+            if (input.RecapDay is < 1 or > 7) return EndpointAuth.Bad("Récap : jour d'envoi invalide.");
+            if (input.RecapHour is < 0 or > 23) return EndpointAuth.Bad("Récap : heure d'envoi invalide.");
+            if (input.RecapEnabled && Snow(input.RecapChannelId) is null) return EndpointAuth.Bad("Récap : choisis le salon où l'envoyer.");
+            s.RecapEnabled = input.RecapEnabled;
+            s.RecapChannelId = Snow(input.RecapChannelId);
+            s.RecapPingRoleId = Snow(input.RecapPingRoleId);
+            s.RecapDay = input.RecapDay;
+            s.RecapHour = input.RecapHour;
+            s.RecapWeek = input.RecapWeek == "current" ? "current" : "previous";
+            s.RecapAmounts = input.RecapAmounts;
+            s.RecapCompare = input.RecapCompare;
+            s.RecapVehicles = input.RecapVehicles;
+            s.RecapSellers = input.RecapSellers;
+            s.RecapClients = input.RecapClients;
 
             await config.SaveSettingsAsync(s);
             http.RefreshTourBoard(); // salon, libellés ou seuil de retard ont pu changer

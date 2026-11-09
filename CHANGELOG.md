@@ -3,6 +3,12 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.13.0 — 09/11/2026 · Récap hebdomadaire automatique
+
+- **Nouveau** : Configuration → Discord, tournée & statuts → « Récap hebdomadaire ». Envoi automatique du récap une fois par semaine dans le salon choisi : jour et heure (heure de Paris), semaine dernière ou semaine en cours, rôle mentionné, sections au choix. Rattrapage jusqu'à 24 h si le portail était arrêté à l'heure prévue. Un seul envoi automatique par semaine, découpé en plusieurs messages s'il dépasse 2000 caractères.
+- **Nouveau** : bouton « Envoyer un test maintenant » (réglages affichés, sans mention, tracé dans les logs). Dernier et prochain envoi affichés.
+- **Amélioration** : le texte du récap est généré par l'API (`/api/stats/recap`), commun à Analyse et à l'envoi automatique. Calcul des statistiques regroupé dans `StatsService`.
+
 ## v1.12.0 — 09/11/2026 · Récap Discord
 
 - **Nouveau** : Analyse → bouton « Récap Discord ». Génère un message mis en forme pour Discord, à copier en un clic : semaine dernière (lundi → dimanche), semaine en cours ou période affichée. Contenu : ventes et livraisons avec évolution par rapport à la période précédente, top 5 véhicules, podium des vendeurs, clients (nouveaux, premier achat, déjà clients). Montants, comparaison et chaque section activables ; choix mémorisés dans le navigateur. Compteur de la limite de 2000 caractères.
