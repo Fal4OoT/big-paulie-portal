@@ -3,6 +3,10 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.13.1 — 09/11/2026 · Numéro du client dans la tournée
+
+- **Amélioration** : vue Tournée, le téléphone du client est affiché sur chaque véhicule ; un clic copie les 10 chiffres.
+
 ## v1.13.0 — 09/11/2026 · Récap hebdomadaire automatique
 
 - **Nouveau** : Configuration → Discord, tournée & statuts → « Récap hebdomadaire ». Envoi automatique du récap une fois par semaine dans le salon choisi : jour et heure (heure de Paris), semaine dernière ou semaine en cours, rôle mentionné, sections au choix. Rattrapage jusqu'à 24 h si le portail était arrêté à l'heure prévue. Un seul envoi automatique par semaine, découpé en plusieurs messages s'il dépasse 2000 caractères.

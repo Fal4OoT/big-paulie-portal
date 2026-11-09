@@ -1,11 +1,11 @@
 "use client";
 
-import { AlertTriangle, Clock, Megaphone, PackageCheck, ShoppingCart, Zap } from "lucide-react";
+import { AlertTriangle, Check, Clock, Megaphone, PackageCheck, Phone, ShoppingCart, Zap } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Button, Empty, ErrorBox, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/format";
+import { cn, formatPhone } from "@/lib/format";
 import { PERM, useCan, useStatus } from "@/lib/portal-context";
 import type { Sale, StatusCode, TourData } from "@/lib/types";
 
@@ -237,6 +237,7 @@ function Column({
                 <div className="truncate text-xs text-cream-muted">
                   <span className="font-mono text-sand">{sale.reference}</span> · {sale.vehicleTypeLabel} · {sale.clientName}
                 </div>
+                {sale.clientPhone && <PhoneCopy phone={sale.clientPhone} />}
               </div>
             </div>
           ))
@@ -244,5 +245,34 @@ function Column({
       </div>
       {action && <footer className="border-t border-night-500/70 p-3">{action}</footer>}
     </section>
+  );
+}
+
+/** Numéro du client : clic = copie des 10 chiffres (à composer en jeu). */
+function PhoneCopy({ phone }: { phone: string }) {
+  const [copied, setCopied] = useState(false);
+  const digits = phone.replace(/\D/g, "");
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(digits || phone);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* presse-papiers indisponible : le numéro reste lisible */
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title="Copier le numéro"
+      className="mt-0.5 inline-flex items-center gap-1 text-xs tabular-nums text-cream transition-colors hover:text-sand"
+    >
+      {copied ? <Check className="h-3 w-3 text-emerald-300" /> : <Phone className="h-3 w-3 text-cream-dim" />}
+      {formatPhone(phone)}
+      {copied && <span className="text-emerald-300">copié</span>}
+    </button>
   );
 }

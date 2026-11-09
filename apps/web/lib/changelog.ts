@@ -18,6 +18,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.13.1",
+    date: "2026-11-09",
+    title: "Numéro du client dans la tournée",
+    changes: [
+      { kind: "amélioration", text: "Tournée : le numéro de téléphone du client s'affiche sur chaque véhicule. Un clic le copie (10 chiffres) pour le rappeler plus vite." },
+    ],
+  },
+  {
     version: "1.13.0",
     date: "2026-11-09",
     title: "Récap hebdomadaire automatique",
