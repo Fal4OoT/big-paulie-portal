@@ -79,13 +79,26 @@ public static class ClientEndpoints
     {
         var g = app.MapGroup("/api/clients");
 
-        g.MapGet("/", async (NpgsqlDataSource db, string? q, int? limit) =>
+        g.MapGet("/", async (NpgsqlDataSource db, string? q, int? limit, string? sort, string? dir) =>
         {
             var p = new DynamicParameters();
-            p.Add("limit", Math.Clamp(limit ?? 100, 1, 500));
+            p.Add("limit", Math.Clamp(limit ?? 100, 1, 1000));
             var where = "WHERE c.deleted_at IS NULL" + SearchClause("c.search_text", q, p);
+            // Tri sur toute la base (liste blanche de colonnes), les valeurs vides toujours à la fin.
+            var column = sort switch
+            {
+                // Accents ignorés (« Élodie » avec les E), quel que soit le classement de la base.
+                "name" => "translate(lower(trim(coalesce(c.data->>'prenom','') || ' ' || coalesce(c.data->>'nom',''))), 'àâäáãåçéèêëíìîïñóòôöõúùûüýÿ', 'aaaaaaceeeeiiiinooooouuuuyy')",
+                "phone" => "nullif(c.data->>'telephone', '')",
+                "birth" => "nullif(c.data->>'date_naissance', '')",
+                "sales" => "sale_count",
+                "created" => "c.created_at",
+                _ => "c.updated_at",
+            };
+            var direction = dir == "asc" ? "ASC" : dir == "desc" ? "DESC" : sort is null or "updated" or "created" or "sales" ? "DESC" : "ASC";
             await using var c = await db.OpenConnectionAsync();
-            var rows = await c.QueryAsync<ClientRow>($"{SelectClient} {where} ORDER BY c.updated_at DESC LIMIT @limit", p);
+            var rows = await c.QueryAsync<ClientRow>(
+                $"{SelectClient} {where} ORDER BY {column} {direction} NULLS LAST, c.created_at DESC LIMIT @limit", p);
             return Results.Ok(rows.Select(ToDto));
         }).RequirePerm(Permissions.ClientsView);
 

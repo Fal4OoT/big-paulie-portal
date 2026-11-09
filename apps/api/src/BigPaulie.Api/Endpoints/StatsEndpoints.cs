@@ -17,6 +17,17 @@ public static class StatsEndpoints
         public decimal Revenue { get; set; }
     }
 
+    private sealed class ClientTotals
+    {
+        public int NewClients { get; set; }
+        public int Buyers { get; set; }
+        public int FirstTimeBuyers { get; set; }
+        public int ReturningBuyers { get; set; }
+        public int RepeatBuyers { get; set; }
+        public int NewClientsConverted { get; set; }
+        public int TotalClients { get; set; }
+    }
+
     private sealed class Totals
     {
         public int Count { get; set; }
@@ -45,6 +56,7 @@ public static class StatsEndpoints
             // Période en heure de Paris, convertie en instants UTC pour l'index sur created_at.
             const string Period = "s.created_at >= (@start::timestamp AT TIME ZONE @tz) AND s.created_at < (@endExcl::timestamp AT TIME ZONE @tz)";
             const string Valid = Period + " AND s.status <> 'CANCELLED'";
+            const string ClientPeriod = "c.created_at >= (@start::timestamp AT TIME ZONE @tz) AND c.created_at < (@endExcl::timestamp AT TIME ZONE @tz)";
 
             await using var c = await db.OpenConnectionAsync();
 
@@ -109,13 +121,48 @@ public static class StatsEndpoints
                 GROUP BY 1 ORDER BY 1
                 """, p)).ToDictionary(d => DateOnly.FromDateTime(d.Day));
 
+            // Clients enregistrés par jour (même période, heure de Paris).
+            var newClientsDaily = (await c.QueryAsync<(DateTime Day, int Count)>($"""
+                SELECT (c.created_at AT TIME ZONE @tz)::date AS day, count(*)::int
+                FROM clients c WHERE c.deleted_at IS NULL AND {ClientPeriod}
+                GROUP BY 1 ORDER BY 1
+                """, p)).ToDictionary(d => DateOnly.FromDateTime(d.Day), d => d.Count);
+
             // Tous les jours de la période, même sans vente (pour le graphique).
             var days = new List<object>();
             for (var d = start; d <= end; d = d.AddDays(1))
             {
                 daily.TryGetValue(d, out var row);
-                days.Add(new { date = d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), count = row.Count, revenue = row.Revenue });
+                newClientsDaily.TryGetValue(d, out var newClients);
+                days.Add(new { date = d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), count = row.Count, revenue = row.Revenue, newClients });
             }
+
+            // Clients : nouveaux, acheteurs (premier achat / déjà clients), achats répétés, transformation.
+            var clients = await c.QuerySingleAsync<ClientTotals>($"""
+                WITH period_sales AS (SELECT s.client_id, s.price FROM sales s WHERE {Valid}),
+                     first_sale AS (SELECT s.client_id, min(s.created_at) AS first_at FROM sales s WHERE s.status <> 'CANCELLED' GROUP BY s.client_id),
+                     per_client AS (SELECT client_id, count(*) AS n FROM period_sales GROUP BY client_id)
+                SELECT
+                    (SELECT count(*)::int FROM clients c WHERE c.deleted_at IS NULL AND {ClientPeriod}) AS new_clients,
+                    (SELECT count(*)::int FROM per_client) AS buyers,
+                    (SELECT count(*)::int FROM per_client pc JOIN first_sale f ON f.client_id = pc.client_id
+                       WHERE f.first_at >= (@start::timestamp AT TIME ZONE @tz)) AS first_time_buyers,
+                    (SELECT count(*)::int FROM per_client pc JOIN first_sale f ON f.client_id = pc.client_id
+                       WHERE f.first_at < (@start::timestamp AT TIME ZONE @tz)) AS returning_buyers,
+                    (SELECT count(*)::int FROM per_client WHERE n > 1) AS repeat_buyers,
+                    (SELECT count(*)::int FROM clients c WHERE c.deleted_at IS NULL AND {ClientPeriod}
+                       AND EXISTS (SELECT 1 FROM per_client pc WHERE pc.client_id = c.id)) AS new_clients_converted,
+                    (SELECT count(*)::int FROM clients WHERE deleted_at IS NULL) AS total_clients
+                """, p);
+
+            var topClients = await c.QueryAsync<GroupRow>($"""
+                SELECT trim(coalesce(c.data->>'prenom','') || ' ' || coalesce(c.data->>'nom','')) AS label,
+                       c.id::text AS detail, count(*)::int AS count, sum(s.price) AS revenue
+                FROM sales s JOIN clients c ON c.id = s.client_id
+                WHERE {Valid}
+                GROUP BY c.id ORDER BY sum(s.price) DESC, count(*) DESC
+                LIMIT 50
+                """, p);
 
             return Results.Ok(new
             {
@@ -127,6 +174,8 @@ public static class StatsEndpoints
                 types,
                 sellers,
                 days,
+                clients,
+                topClients,
             });
         }).RequirePerm(Permissions.StatsView);
     }

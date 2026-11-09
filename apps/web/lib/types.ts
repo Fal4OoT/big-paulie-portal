@@ -155,7 +155,18 @@ export interface StatsData {
   segments: StatsGroup[];
   types: StatsGroup[];
   sellers: StatsGroup[];
-  days: { date: string; count: number; revenue: number }[];
+  days: { date: string; count: number; revenue: number; newClients: number }[];
+  clients: {
+    newClients: number;
+    buyers: number;
+    firstTimeBuyers: number;
+    returningBuyers: number;
+    repeatBuyers: number;
+    newClientsConverted: number;
+    totalClients: number;
+  };
+  /** detail = identifiant du client (lien vers sa fiche). */
+  topClients: StatsGroup[];
 }
 
 export type StatusCode = "TO_ORDER" | "TO_FETCH" | "RECEIVED" | "DELIVERED" | "CANCELLED";

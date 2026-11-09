@@ -3,6 +3,11 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.11.0 — 09/11/2026 · Analyse des clients et tri de la liste des clients
+
+- **Nouveau** : Analyse → Clients, sur la période choisie : nouveaux clients enregistrés (et courbe par jour), clients acheteurs répartis entre premier achat et déjà clients, clients ayant acheté plusieurs fois, part des nouveaux clients qui ont acheté, montant moyen par client acheteur, top 10 des clients (nombre d'achats ou montant).
+- **Amélioration** : liste des clients triable sur chaque colonne (tri fait sur toute la base, accents ignorés), par défaut par client de A à Z, tri mémorisé dans le navigateur. Nouvelle colonne « Client depuis ».
+
 ## v1.10.0 — 07/11/2026 · Guide du portail et montant minimum de fidélité
 
 - **Nouveau** : guide d'utilisation dans Formation (catégorie « Guide du portail », 10 fiches) : prise en main, clients, achats, livraison, tournée, avantages clients, partenariat, bot Discord, configuration et questions fréquentes. Modifiables par le Patron comme toute fiche.

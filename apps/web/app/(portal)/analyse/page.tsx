@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Card, Empty, ErrorBox, Input, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -121,8 +122,15 @@ export default function AnalysePage() {
           </p>
 
           <Card title={metric === "count" ? "Ventes par jour" : "Montant par jour"}>
-            <DailyChart days={data.days} metric={metric} />
+            <DailyChart
+              days={data.days}
+              value={(d) => d[metric]}
+              empty="Aucune vente sur la période."
+              describe={(d) => `${d.count} vente(s) · ${formatMoney(d.revenue)}`}
+            />
           </Card>
+
+          <ClientsSection data={data} metric={metric} fmt={fmt} />
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card title="Véhicules les plus vendus" className="lg:row-span-2">
@@ -142,6 +150,68 @@ export default function AnalysePage() {
         </div>
       )}
     </>
+  );
+}
+
+/** Section « Clients » : nouveaux, acheteurs, fidèles, transformation, meilleurs clients. */
+function ClientsSection({ data, metric, fmt }: { data: StatsData; metric: Metric; fmt: (g: StatsGroup) => string }) {
+  const k = data.clients;
+  const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)} %` : "—");
+  return (
+    <section className="space-y-4">
+      <h2 className="font-display text-xl uppercase tracking-wide text-sand">Clients</h2>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat label="Nouveaux clients enregistrés" value={`${k.newClients}`} hint={`${k.totalClients} clients au total`} />
+        <Stat
+          label="Clients acheteurs"
+          value={`${k.buyers}`}
+          hint={`${k.firstTimeBuyers} premier achat · ${k.returningBuyers} déjà clients`}
+        />
+        <Stat label="Ont acheté plusieurs fois" value={`${k.repeatBuyers}`} hint={`${pct(k.repeatBuyers, k.buyers)} des acheteurs`} />
+        <Stat
+          label="Nouveaux clients qui ont acheté"
+          value={pct(k.newClientsConverted, k.newClients)}
+          hint={`${k.newClientsConverted} sur ${k.newClients} enregistré(s)`}
+        />
+      </div>
+      <p className="text-xs text-cream-dim">
+        Montant moyen par client acheteur : {k.buyers > 0 ? formatMoney(Math.round(data.totals.revenue / k.buyers)) : "—"} · « Déjà clients » : clients
+        dont le premier achat est antérieur à la période.
+      </p>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card title="Nouveaux clients par jour">
+          <DailyChart days={data.days} value={(d) => d.newClients} empty="Aucun nouveau client sur la période." describe={(d) => `${d.newClients} nouveau(x) client(s)`} />
+        </Card>
+        <Card title={metric === "count" ? "Meilleurs clients (nombre d'achats)" : "Meilleurs clients (montant)"}>
+          <ClientBarList rows={data.topClients.slice(0, 10)} metric={metric} fmt={fmt} />
+        </Card>
+      </div>
+    </section>
+  );
+}
+
+function ClientBarList({ rows, metric, fmt }: { rows: StatsGroup[]; metric: Metric; fmt: (g: StatsGroup) => string }) {
+  const sorted = useMemo(() => [...rows].sort((a, b) => b[metric] - a[metric] || a.label.localeCompare(b.label)), [rows, metric]);
+  if (sorted.length === 0) return <Empty>Aucun achat sur la période.</Empty>;
+  const max = Math.max(...sorted.map((r) => r[metric]), 1);
+  return (
+    <ul className="space-y-2.5">
+      {sorted.map((r, i) => (
+        <li key={r.detail ?? i} title={`${r.label} : ${r.count} achat(s) · ${formatMoney(r.revenue)}`}>
+          <div className="mb-1 flex items-baseline gap-2 text-sm">
+            <span className="w-5 shrink-0 text-right text-xs tabular-nums text-cream-dim">{i + 1}</span>
+            <Link href={`/clients/${r.detail}`} className="truncate hover:underline">
+              {r.label || "Client sans nom"}
+            </Link>
+            <span className="ml-auto shrink-0 tabular-nums text-cream">{fmt(r)}</span>
+          </div>
+          <div className="ml-7 h-2 rounded-full bg-night-600/60">
+            <div className="h-2 rounded-full bg-sand" style={{ width: `${Math.max(2, (r[metric] / max) * 100)}%` }} />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -201,12 +271,14 @@ function BarList({
   );
 }
 
+type Day = StatsData["days"][number];
+
 /** Colonnes par jour, avec infobulle au survol (zone de survol = toute la colonne). */
-function DailyChart({ days, metric }: { days: StatsData["days"]; metric: Metric }) {
+function DailyChart({ days, value, empty, describe }: { days: Day[]; value: (d: Day) => number; empty: string; describe: (d: Day) => string }) {
   const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(...days.map((d) => d[metric]), 1);
-  const total = days.reduce((s, d) => s + d[metric], 0);
-  if (total === 0) return <Empty>Aucune vente sur la période.</Empty>;
+  const max = Math.max(...days.map(value), 1);
+  const total = days.reduce((s, d) => s + value(d), 0);
+  if (total === 0) return <Empty>{empty}</Empty>;
 
   const labelEvery = Math.ceil(days.length / 12);
   const h = hover !== null ? days[hover] : null;
@@ -216,7 +288,7 @@ function DailyChart({ days, metric }: { days: StatsData["days"]; metric: Metric 
       <div className="mb-2 h-5 text-sm text-cream-muted">
         {h ? (
           <>
-            <span className="text-cream">{formatDate(h.date)}</span> · {h.count} vente(s) · {formatMoney(h.revenue)}
+            <span className="text-cream">{formatDate(h.date)}</span> · {describe(h)}
           </>
         ) : (
           "Survole une colonne pour le détail."
@@ -228,11 +300,11 @@ function DailyChart({ days, metric }: { days: StatsData["days"]; metric: Metric 
             key={d.date}
             className="flex h-full flex-1 cursor-default items-end"
             onMouseEnter={() => setHover(i)}
-            aria-label={`${formatDate(d.date)} : ${d.count} vente(s), ${formatMoney(d.revenue)}`}
+            aria-label={`${formatDate(d.date)} : ${describe(d)}`}
           >
             <div
               className={cn("w-full rounded-t-[4px] transition-colors", hover === i ? "bg-[#E8BC63]" : "bg-sand")}
-              style={{ height: d[metric] > 0 ? `${Math.max(2, (d[metric] / max) * 100)}%` : 0 }}
+              style={{ height: value(d) > 0 ? `${Math.max(2, (value(d) / max) * 100)}%` : 0 }}
             />
           </div>
         ))}

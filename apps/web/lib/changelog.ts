@@ -18,6 +18,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.11.0",
+    date: "2026-11-09",
+    title: "Analyse des clients et tri de la liste des clients",
+    changes: [
+      { kind: "nouveau", text: "Analyse → Clients : nouveaux clients enregistrés (avec la courbe par jour), clients acheteurs (premier achat ou déjà clients), clients ayant acheté plusieurs fois, part des nouveaux clients qui ont acheté, montant moyen par client et meilleurs clients." },
+      { kind: "amélioration", text: "Liste des clients : toutes les colonnes se trient d'un clic (sur toute la base), par défaut par client de A à Z. Nouvelle colonne « Client depuis »." },
+    ],
+  },
+  {
     version: "1.10.0",
     date: "2026-11-07",
     title: "Guide du portail et montant minimum de fidélité",
