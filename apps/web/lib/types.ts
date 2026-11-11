@@ -217,7 +217,22 @@ export interface PartnerConfig extends PartnerPublic {
   channelId: string | null;
 }
 
-export interface PartnerEligible {
+/** Détail d'une customisation (tout est facultatif). Niveaux 1 à 6, null = pièce non modifiée. */
+export interface Customization {
+  cosmetic: boolean | null;
+  cosmeticAmount: number | null;
+  performance: boolean | null;
+  performanceAmount: number | null;
+  engine: number | null;
+  turbo: boolean | null;
+  transmission: number | null;
+  suspension: number | null;
+  brakes: number | null;
+}
+
+export interface PartnerEligible extends Customization {
+  updatedAt: string | null;
+  updatedByName: string | null;
   saleId: string;
   number: number;
   vehicleName: string;
@@ -233,7 +248,9 @@ export interface PartnerEligible {
   validatedByName: string | null;
 }
 
-export interface PartnerValidation {
+export interface PartnerValidation extends Customization {
+  updatedAt: string | null;
+  updatedByName: string | null;
   id: string;
   partnerId: string;
   partnerName: string;
@@ -258,7 +275,20 @@ export interface PartnerSpace {
 }
 
 export interface PartnersOverview {
-  partners: (PartnerConfig & { stats: { count30: number; amount30: number; countAll: number; amountAll: number } })[];
+  partners: (PartnerConfig & {
+    stats: {
+      count30: number;
+      amount30: number;
+      countAll: number;
+      amountAll: number;
+      cosmetic30: number;
+      performance30: number;
+      cosmeticAll: number;
+      performanceAll: number;
+      cosmeticCount: number;
+      performanceCount: number;
+    };
+  })[];
   recent: PartnerValidation[];
 }
 
@@ -414,7 +444,8 @@ export interface InactiveClient {
   lastPurchaseAt: string;
 }
 
-export interface SalePartnerValidation {
+export interface SalePartnerValidation extends Customization {
+  updatedAt: string | null;
   id: string;
   partnerName: string;
   amount: number | null;

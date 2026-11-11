@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Ban, Check, Gift, Pencil, PhoneCa
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { CustomizationSummary } from "@/components/Customization";
 import { FieldDisplay } from "@/components/DynamicFields";
 import { PhoneCopy } from "@/components/PhoneCopy";
 import { SaleFormModal } from "@/components/SaleForm";
@@ -257,6 +258,7 @@ export default function SalePage() {
                             · customisation validée le {formatDateTime(v.validatedAt)}
                             {v.validatedByName && <> par {v.validatedByName}</>}
                             {v.amount != null && <> · {formatMoney(v.amount)}</>}
+                            <CustomizationSummary value={v} className="mt-0.5 pl-5" />
                           </span>
                         ) : until ? (
                           <span className={until > Date.now() ? "text-amber-100" : "text-cream-dim"}>

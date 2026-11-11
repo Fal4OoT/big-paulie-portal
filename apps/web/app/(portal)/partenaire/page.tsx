@@ -1,12 +1,13 @@
 "use client";
 
-import { CheckCircle2, Clock, FileText, Search, Users, Wrench } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { CheckCircle2, Clock, FileText, Pencil, Search, Users, Wrench } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CustomizationModal, CustomizationSummary, type CustomizationTarget } from "@/components/Customization";
 import { normalize } from "@/components/VehicleSearch";
-import { Badge, Button, Card, Empty, ErrorBox, Input, Label, Modal, PageHeader, Spinner, Textarea } from "@/components/ui";
+import { Badge, Button, Card, Empty, ErrorBox, Input, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import { cn, formatDateTime, formatMoney } from "@/lib/format";
-import type { PartnerEligible, PartnerSpace } from "@/lib/types";
+import type { PartnerEligible, PartnerSpace, PartnerValidation } from "@/lib/types";
 
 type Tab = "vehicles" | "history" | "employees" | "contract";
 
@@ -16,7 +17,7 @@ export default function PartnerSpacePage() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("vehicles");
   const [q, setQ] = useState("");
-  const [validating, setValidating] = useState<PartnerEligible | null>(null);
+  const [validating, setValidating] = useState<CustomizationTarget | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
@@ -130,6 +131,12 @@ export default function PartnerSpacePage() {
                           {v.validatedByName ?? "—"} · {formatDateTime(v.validatedAt)}
                           {v.amount != null && <> · {formatMoney(v.amount)}</>}
                         </div>
+                        <CustomizationSummary value={v} className="mt-1" />
+                        {data.canValidate && (
+                          <button onClick={() => setValidating(editTarget(v, v.validationId!))} className="mt-1 inline-flex items-center gap-1 text-xs text-sand hover:underline">
+                            <Pencil className="h-3 w-3" /> Modifier
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <>
@@ -137,7 +144,11 @@ export default function PartnerSpacePage() {
                           <Clock className="h-4 w-4" /> encore {h} h {String(m).padStart(2, "0")}
                         </span>
                         {data.canValidate && (
-                          <Button size="sm" variant="green" onClick={() => setValidating(v)}>
+                          <Button
+                            size="sm"
+                            variant="green"
+                            onClick={() => setValidating({ saleId: v.saleId, vehicleName: v.vehicleName, plate: v.plate, clientName: v.clientName })}
+                          >
                             <CheckCircle2 className="h-4 w-4" /> Customisation effectuée
                           </Button>
                         )}
@@ -164,7 +175,8 @@ export default function PartnerSpacePage() {
                     <th>Véhicule</th>
                     <th>Client</th>
                     <th className="text-right">Montant</th>
-                    <th className="pr-5">Par</th>
+                    <th className={data.canValidate ? "" : "pr-5"}>Par</th>
+                    {data.canValidate && <th className="pr-5" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -174,11 +186,27 @@ export default function PartnerSpacePage() {
                       <td>
                         {h.vehicleName}
                         {h.plate && <span className="ml-2 font-mono text-xs text-cream-dim">{h.plate}</span>}
+                        <CustomizationSummary value={h} />
                         {h.note && <div className="text-xs text-cream-dim">{h.note}</div>}
                       </td>
                       <td>{h.clientName}</td>
                       <td className="text-right tabular-nums">{h.amount != null ? formatMoney(h.amount) : "—"}</td>
-                      <td className="pr-5 text-xs text-cream-muted">{h.validatedByName ?? "—"}</td>
+                      <td className={cn("text-xs text-cream-muted", !data.canValidate && "pr-5")}>
+                        {h.validatedByName ?? "—"}
+                        {h.updatedAt && (
+                          <div className="text-cream-dim">
+                            modifiée le {formatDateTime(h.updatedAt)}
+                            {h.updatedByName && ` par ${h.updatedByName}`}
+                          </div>
+                        )}
+                      </td>
+                      {data.canValidate && (
+                        <td className="pr-5 text-right">
+                          <Button size="sm" variant="ghost" onClick={() => setValidating(editTarget(h, h.id))} title="Modifier">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -234,8 +262,8 @@ export default function PartnerSpacePage() {
       )}
 
       {validating && (
-        <ValidateModal
-          vehicle={validating}
+        <CustomizationModal
+          target={validating}
           discount={p.discountPercent}
           onClose={() => setValidating(null)}
           onDone={async () => {
@@ -248,53 +276,25 @@ export default function PartnerSpacePage() {
   );
 }
 
-function ValidateModal({ vehicle, discount, onClose, onDone }: { vehicle: PartnerEligible; discount: number; onClose: () => void; onDone: () => void }) {
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    const a = amount.trim() === "" ? null : Number(amount.replace(/\s/g, "").replace(",", "."));
-    if (a !== null && (!Number.isFinite(a) || a < 0)) return setError("Montant invalide.");
-    setSaving(true);
-    setError(null);
-    try {
-      await api.post(`/api/partner/sales/${vehicle.saleId}/validate`, { amount: a, note: note || null });
-      onDone();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Validation impossible.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Modal open onClose={onClose} title="Customisation effectuée">
-      <form onSubmit={submit} className="space-y-4">
-        <p className="text-sm text-cream-muted">
-          <strong className="text-cream">{vehicle.vehicleName}</strong>
-          {vehicle.plate && <> · {vehicle.plate}</>} · {vehicle.clientName}
-        </p>
-        <div>
-          <Label htmlFor="pv-amount">Montant facturé, réduction de {discount} % comprise ($)</Label>
-          <Input id="pv-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="ex : 4500" autoFocus />
-        </div>
-        <div>
-          <Label htmlFor="pv-note">Note (facultative)</Label>
-          <Textarea id="pv-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="ex : peinture + jantes" />
-        </div>
-        <ErrorBox message={error} />
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Annuler
-          </Button>
-          <Button type="submit" variant="green" loading={saving}>
-            Valider
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
+/** Cible de modification d'une customisation déjà validée. */
+function editTarget(v: PartnerEligible | PartnerValidation, validationId: string): CustomizationTarget {
+  return {
+    validationId,
+    vehicleName: v.vehicleName,
+    plate: v.plate,
+    clientName: v.clientName,
+    initial: {
+      amount: v.amount,
+      note: v.note,
+      cosmetic: v.cosmetic,
+      cosmeticAmount: v.cosmeticAmount,
+      performance: v.performance,
+      performanceAmount: v.performanceAmount,
+      engine: v.engine,
+      turbo: v.turbo,
+      transmission: v.transmission,
+      suspension: v.suspension,
+      brakes: v.brakes,
+    },
+  };
 }

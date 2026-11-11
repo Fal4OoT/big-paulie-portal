@@ -18,6 +18,18 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.15.0",
+    date: "2026-11-11",
+    title: "Détail des customisations",
+    changes: [
+      { kind: "nouveau", text: "Espace partenaire : la validation d'une customisation détaille le cosmétique et la performance (montant de chacun, Moteur / Transmission / Suspension / Freins niveau 1 à 6, Turbo). Tout est facultatif." },
+      { kind: "nouveau", text: "Bouton « Full perf » : coche toutes les pièces au niveau maximum et le Turbo." },
+      { kind: "amélioration", text: "Montant total calculé automatiquement (cosmétique + performance), toujours modifiable à la main." },
+      { kind: "nouveau", text: "Le garage peut modifier une customisation déjà validée (oubli, erreur) : modification tracée dans les logs et son salon." },
+      { kind: "amélioration", text: "Page Partenaires et fiche vente : détail de chaque customisation, totaux cosmétique et performance." },
+    ],
+  },
+  {
     version: "1.14.0",
     date: "2026-11-09",
     title: "Suivi client",

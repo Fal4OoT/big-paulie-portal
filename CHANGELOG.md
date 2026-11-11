@@ -3,6 +3,14 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.15.0 — 11/11/2026 · Détail des customisations
+
+- **Nouveau** : validation partenaire détaillée, tout facultatif : Cosmétique (+ montant), Performance (+ montant, Moteur / Transmission / Suspension / Freins niveau 1 à 6, Turbo). Bouton « Full perf ».
+- **Amélioration** : montant total pré-calculé (cosmétique + performance), modifiable à la main ; les anciennes validations gardent leur montant total.
+- **Nouveau** : `PUT /api/partner/validations/{id}` : le garage corrige une customisation validée (`updated_by` / `updated_at`, log + salon du partenaire).
+- **Amélioration** : page Partenaires (totaux cosmétique / performance, 30 j et total), fiche vente et historiques affichent le détail.
+- **Base** : migration `011_customization` (colonnes de détail sur `partner_validations`, mise à jour de la fiche du guide).
+
 ## v1.14.0 — 09/11/2026 · Suivi client
 
 - **Nouveau** : suivi des appels sur les ventes (tournée 📞 et fiche vente) : pas de réponse, message laissé, client joint, RDV pris. Facultatif, sans effet sur les statuts. Permission « Noter un appel / un rendez-vous de livraison » (`sales.contact`), donnée aux grades qui font avancer les statuts.

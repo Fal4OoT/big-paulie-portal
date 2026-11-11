@@ -178,7 +178,9 @@ public static class SaleEndpoints
             var sale = await c.QuerySingleOrDefaultAsync<SaleView>($"{SelectSale} WHERE s.id = @id", new { id });
             if (sale is null) return EndpointAuth.NotFound("Vente introuvable.");
             var partnerValidations = await c.QueryAsync("""
-                SELECT pv.id, p.name AS partner_name, pv.amount, pv.note, pv.validated_at, u.display_name AS validated_by_name
+                SELECT pv.id, p.name AS partner_name, pv.amount, pv.note, pv.validated_at, u.display_name AS validated_by_name,
+                       pv.cosmetic, pv.cosmetic_amount, pv.performance, pv.performance_amount,
+                       pv.engine, pv.turbo, pv.transmission, pv.suspension, pv.brakes, pv.updated_at
                 FROM partner_validations pv JOIN partners p ON p.id = pv.partner_id LEFT JOIN users u ON u.id = pv.validated_by
                 WHERE pv.sale_id = @id AND pv.cancelled_at IS NULL ORDER BY pv.validated_at
                 """, new { id });
@@ -205,6 +207,16 @@ public static class SaleEndpoints
                     note = (string?)v.note,
                     validatedAt = (DateTime)v.validated_at,
                     validatedByName = (string?)v.validated_by_name,
+                    cosmetic = (bool)v.cosmetic,
+                    cosmeticAmount = (decimal?)v.cosmetic_amount,
+                    performance = (bool)v.performance,
+                    performanceAmount = (decimal?)v.performance_amount,
+                    engine = (int?)v.engine,
+                    turbo = (bool)v.turbo,
+                    transmission = (int?)v.transmission,
+                    suspension = (int?)v.suspension,
+                    brakes = (int?)v.brakes,
+                    updatedAt = (DateTime?)v.updated_at,
                 }),
             });
         }).RequirePerm(Permissions.SalesView);

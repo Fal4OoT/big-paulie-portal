@@ -3,6 +3,7 @@
 import { Ban, Eye, Handshake } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { CustomizationSummary } from "@/components/Customization";
 import { Button, Card, Empty, ErrorBox, PageHeader, Spinner } from "@/components/ui";
 import { api } from "@/lib/api";
 import { formatDateTime, formatMoney } from "@/lib/format";
@@ -91,6 +92,16 @@ export default function PartnersPage() {
                   <Stat label="Montant (30 j)" value={formatMoney(p.stats.amount30)} />
                   <Stat label="Customisations (total)" value={`${p.stats.countAll}`} />
                   <Stat label="Montant (total)" value={formatMoney(p.stats.amountAll)} />
+                  <Stat
+                    label="🎨 Cosmétique (total)"
+                    value={formatMoney(p.stats.cosmeticAll)}
+                    hint={`${p.stats.cosmeticCount} customisation(s) · 30 j : ${formatMoney(p.stats.cosmetic30)}`}
+                  />
+                  <Stat
+                    label="⚙️ Performance (total)"
+                    value={formatMoney(p.stats.performanceAll)}
+                    hint={`${p.stats.performanceCount} customisation(s) · 30 j : ${formatMoney(p.stats.performance30)}`}
+                  />
                 </div>
               </div>
             </Card>
@@ -123,11 +134,15 @@ export default function PartnersPage() {
                             {v.vehicleName}
                           </Link>
                           {v.plate && <span className="ml-2 font-mono text-xs text-cream-dim">{v.plate}</span>}
+                          <CustomizationSummary value={v} />
                           {v.note && <div className="text-xs text-cream-dim">{v.note}</div>}
                         </td>
                         <td>{v.clientName}</td>
                         <td className="text-right tabular-nums">{v.amount != null ? formatMoney(v.amount) : "—"}</td>
-                        <td className="text-xs text-cream-muted">{v.validatedByName ?? "—"}</td>
+                        <td className="text-xs text-cream-muted">
+                          {v.validatedByName ?? "—"}
+                          {v.updatedAt && <div className="text-cream-dim">modifiée le {formatDateTime(v.updatedAt)}</div>}
+                        </td>
                         <td className="pr-5 text-right">
                           {can(PERM.partnersCancel) && (
                             <button
@@ -152,11 +167,12 @@ export default function PartnersPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-lg border border-night-500/70 bg-night-900/50 p-3">
       <div className="text-[11px] font-semibold uppercase tracking-wider text-cream-muted">{label}</div>
       <div className="mt-1 font-display text-2xl tabular-nums">{value}</div>
+      {hint && <div className="mt-0.5 text-xs text-cream-dim">{hint}</div>}
     </div>
   );
 }

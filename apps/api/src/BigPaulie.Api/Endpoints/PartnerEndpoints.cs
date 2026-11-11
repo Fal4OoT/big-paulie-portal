@@ -32,19 +32,102 @@ public static partial class PartnerEndpoints
         public string? ChannelId { get; set; }
     }
 
-    public sealed class ValidateInput
+    /// <summary>Détail d'une customisation (tout est facultatif). Niveaux de 1 à 6, null = pièce non modifiée.</summary>
+    public class CustomizationFields
     {
+        public bool? Cosmetic { get; set; }
+        public decimal? CosmeticAmount { get; set; }
+        public bool? Performance { get; set; }
+        public decimal? PerformanceAmount { get; set; }
+        public int? Engine { get; set; }
+        public bool? Turbo { get; set; }
+        public int? Transmission { get; set; }
+        public int? Suspension { get; set; }
+        public int? Brakes { get; set; }
+    }
+
+    public sealed class ValidateInput : CustomizationFields
+    {
+        /// <summary>Montant total facturé (réduction comprise). Vide = somme cosmétique + performance.</summary>
         public decimal? Amount { get; set; }
         public string? Note { get; set; }
     }
+
+    /// <summary>Saisie contrôlée et nettoyée (cases décochées = champs vidés).</summary>
+    private sealed record Customization(decimal? Amount, string? Note, bool Cosmetic, decimal? CosmeticAmount, bool Performance,
+        decimal? PerformanceAmount, int? Engine, bool Turbo, int? Transmission, int? Suspension, int? Brakes);
+
+    private static (string? Error, Customization? Value) Normalize(ValidateInput i)
+    {
+        foreach (var (label, v) in new[] { ("Montant total", i.Amount), ("Montant cosmétique", i.CosmeticAmount), ("Montant performance", i.PerformanceAmount) })
+            if (v is < 0 or > 1_000_000_000) return ($"{label} invalide.", null);
+        foreach (var (label, v) in new[] { ("Moteur", i.Engine), ("Transmission", i.Transmission), ("Suspension", i.Suspension), ("Freins", i.Brakes) })
+            if (v is < 1 or > 6) return ($"{label} : niveau entre 1 et 6.", null);
+        var note = string.IsNullOrWhiteSpace(i.Note) ? null : i.Note.Trim();
+        if (note is { Length: > 500 }) return ("Note : 500 caractères maximum.", null);
+
+        static decimal? R(decimal? v) => v is { } x ? Math.Round(x, 2) : null;
+        var cosmetic = i.Cosmetic == true;
+        var perf = i.Performance == true;
+        var cosmeticAmount = cosmetic ? R(i.CosmeticAmount) : null;
+        var perfAmount = perf ? R(i.PerformanceAmount) : null;
+        // Total saisi à la main, sinon somme des deux montants renseignés.
+        var total = R(i.Amount) ?? (cosmeticAmount is null && perfAmount is null ? null : (cosmeticAmount ?? 0) + (perfAmount ?? 0));
+        return (null, new Customization(total, note, cosmetic, cosmeticAmount, perf, perfAmount,
+            perf ? i.Engine : null, perf && i.Turbo == true, perf ? i.Transmission : null, perf ? i.Suspension : null, perf ? i.Brakes : null));
+    }
+
+    /// <summary>« 🎨 Cosmétique 12 000 $ · ⚙️ Performance 35 000 $ : Moteur 4/6, Turbo, Freins 3/6 ».</summary>
+    private static string Describe(Customization x)
+    {
+        var parts = new List<string>();
+        if (x.Cosmetic) parts.Add("🎨 Cosmétique" + (x.CosmeticAmount is { } c ? $" {SaleEndpoints.Money(c)}" : ""));
+        if (x.Performance)
+        {
+            var pieces = new List<string>();
+            if (x.Engine is { } e) pieces.Add($"Moteur {e}/6");
+            if (x.Turbo) pieces.Add("Turbo");
+            if (x.Transmission is { } t) pieces.Add($"Transmission {t}/6");
+            if (x.Suspension is { } su) pieces.Add($"Suspension {su}/6");
+            if (x.Brakes is { } b) pieces.Add($"Freins {b}/6");
+            parts.Add("⚙️ Performance" + (x.PerformanceAmount is { } pa ? $" {SaleEndpoints.Money(pa)}" : "")
+                      + (pieces.Count > 0 ? " : " + string.Join(", ", pieces) : ""));
+        }
+        return string.Join("\n", parts);
+    }
+
+    private static object Params(Customization x, Guid? me) => new
+    {
+        amount = x.Amount,
+        note = x.Note,
+        cosmetic = x.Cosmetic,
+        cosmeticAmount = x.CosmeticAmount,
+        performance = x.Performance,
+        performanceAmount = x.PerformanceAmount,
+        engine = x.Engine,
+        turbo = x.Turbo,
+        transmission = x.Transmission,
+        suspension = x.Suspension,
+        brakes = x.Brakes,
+        me,
+    };
+
+    /// <summary>Colonnes d'une validation (alias pv, u = validée par, uu = modifiée par).</summary>
+    private const string ValidationCols = """
+        pv.amount, pv.note, pv.validated_at, u.display_name AS validated_by_name,
+        pv.cosmetic, pv.cosmetic_amount, pv.performance, pv.performance_amount,
+        pv.engine, pv.turbo, pv.transmission, pv.suspension, pv.brakes, pv.updated_at, uu.display_name AS updated_by_name
+        """;
 
     public sealed class CancelInput
     {
         public string? Reason { get; set; }
     }
 
-    private sealed class EligibleRow
+    private sealed class EligibleRow : CustomizationFields
     {
+        public DateTime? UpdatedAt { get; set; }
+        public string? UpdatedByName { get; set; }
         public Guid SaleId { get; set; }
         public long Number { get; set; }
         public string VehicleName { get; set; } = "";
@@ -60,8 +143,10 @@ public static partial class PartnerEndpoints
         public string? ValidatedByName { get; set; }
     }
 
-    private sealed class ValidationRow
+    private sealed class ValidationRow : CustomizationFields
     {
+        public DateTime? UpdatedAt { get; set; }
+        public string? UpdatedByName { get; set; }
         public Guid Id { get; set; }
         public Guid PartnerId { get; set; }
         public string PartnerName { get; set; } = "";
@@ -76,6 +161,27 @@ public static partial class PartnerEndpoints
         public DateTime ValidatedAt { get; set; }
         public string? ValidatedByName { get; set; }
     }
+
+    private sealed class StatsRow
+    {
+        [System.Text.Json.Serialization.JsonIgnore] public Guid PartnerId { get; set; }
+        public int Count30 { get; set; }
+        public decimal Amount30 { get; set; }
+        public int CountAll { get; set; }
+        public decimal AmountAll { get; set; }
+        public decimal Cosmetic30 { get; set; }
+        public decimal Performance30 { get; set; }
+        public decimal CosmeticAll { get; set; }
+        public decimal PerformanceAll { get; set; }
+        public int CosmeticCount { get; set; }
+        public int PerformanceCount { get; set; }
+    }
+
+    private static string Summary(string vehicle, string? plate, string client, long number, Customization x) =>
+        $"**{vehicle}**{(plate is null ? "" : $" ({plate})")} de **{client}** — vente {SaleEndpoints.Ref(number)}" +
+        (Describe(x) is { Length: > 0 } d ? $"\n{d}" : "") +
+        (x.Amount is { } amt ? $"\nMontant total : **{SaleEndpoints.Money(amt)}**" : "") +
+        (x.Note is null ? "" : $"\nNote : {x.Note}");
 
     private sealed class EmployeeRow
     {
@@ -97,12 +203,13 @@ public static partial class PartnerEndpoints
         c.QueryAsync<EligibleRow>($"""
             SELECT s.id AS sale_id, s.number, s.vehicle_name, vt.label AS vehicle_type_label, s.plate, {ClientNameSql} AS client_name,
                    s.delivered_at, s.delivered_at + make_interval(hours => @hours) AS expires_at,
-                   pv.id AS validation_id, pv.amount, pv.note, pv.validated_at, u.display_name AS validated_by_name
+                   pv.id AS validation_id, {ValidationCols}
             FROM sales s
             JOIN clients c ON c.id = s.client_id AND c.deleted_at IS NULL
             JOIN vehicle_types vt ON vt.id = s.vehicle_type_id
             LEFT JOIN partner_validations pv ON pv.sale_id = s.id AND pv.partner_id = @pid AND pv.cancelled_at IS NULL
             LEFT JOIN users u ON u.id = pv.validated_by
+            LEFT JOIN users uu ON uu.id = pv.updated_by
             WHERE s.status = 'DELIVERED' AND s.delivered_at >= now() - make_interval(hours => @hours)
               AND (cardinality(@cats) = 0 OR vt.category_id = ANY(@cats))
               AND (@saleId::uuid IS NULL OR s.id = @saleId::uuid)
@@ -133,11 +240,12 @@ public static partial class PartnerEndpoints
             var eligible = await EligibleAsync(c, p!);
             var history = await c.QueryAsync<ValidationRow>($"""
                 SELECT pv.id, pv.partner_id, '' AS partner_name, s.id AS sale_id, s.number, s.vehicle_name, s.plate, {ClientNameSql} AS client_name,
-                       s.delivered_at, pv.amount, pv.note, pv.validated_at, u.display_name AS validated_by_name
+                       s.delivered_at, {ValidationCols}
                 FROM partner_validations pv
                 JOIN sales s ON s.id = pv.sale_id
                 JOIN clients c ON c.id = s.client_id
                 LEFT JOIN users u ON u.id = pv.validated_by
+                LEFT JOIN users uu ON uu.id = pv.updated_by
                 WHERE pv.partner_id = @pid AND pv.cancelled_at IS NULL
                 ORDER BY pv.validated_at DESC LIMIT 200
                 """, new { pid = p!.Id });
@@ -176,9 +284,8 @@ public static partial class PartnerEndpoints
             await using var c = await db.OpenConnectionAsync();
             var (p, err) = await ResolvePartnerAsync(c, me, null);
             if (err is not null) return err;
-            if (input.Amount is < 0 or > 1_000_000_000) return EndpointAuth.Bad("Montant invalide.");
-            var note = string.IsNullOrWhiteSpace(input.Note) ? null : input.Note.Trim();
-            if (note is { Length: > 500 }) return EndpointAuth.Bad("Note : 500 caractères maximum.");
+            var (invalid, x) = Normalize(input);
+            if (invalid is not null) return EndpointAuth.Bad(invalid);
 
             var row = (await EligibleAsync(c, p!, saleId)).FirstOrDefault();
             if (row is null) return EndpointAuth.Bad($"Ce véhicule n'est pas (ou plus) éligible : livraison il y a plus de {p!.WindowHours} h ou catégorie non concernée.");
@@ -186,22 +293,60 @@ public static partial class PartnerEndpoints
 
             try
             {
+                var args = new DynamicParameters(Params(x!, me.Id == Guid.Empty ? null : me.Id));
+                args.Add("pid", p!.Id);
+                args.Add("saleId", saleId);
                 await c.ExecuteAsync("""
-                    INSERT INTO partner_validations (partner_id, sale_id, amount, note, validated_by)
-                    VALUES (@pid, @saleId, @amount, @note, @me)
-                    """, new { pid = p!.Id, saleId, amount = input.Amount is { } a ? Math.Round(a, 2) : (decimal?)null, note, me = me.Id == Guid.Empty ? (Guid?)null : me.Id });
+                    INSERT INTO partner_validations (partner_id, sale_id, amount, note, validated_by, cosmetic, cosmetic_amount, performance,
+                                                     performance_amount, engine, turbo, transmission, suspension, brakes)
+                    VALUES (@pid, @saleId, @amount, @note, @me, @cosmetic, @cosmeticAmount, @performance,
+                            @performanceAmount, @engine, @turbo, @transmission, @suspension, @brakes)
+                    """, args);
             }
             catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
             {
                 return EndpointAuth.Conflict("Cette customisation a déjà été validée.");
             }
 
-            var summary = $"**{row.VehicleName}**{(row.Plate is null ? "" : $" ({row.Plate})")} de **{row.ClientName}** — vente {SaleEndpoints.Ref(row.Number)}" +
-                          (input.Amount is { } amt ? $"\nMontant : **{SaleEndpoints.Money(amt)}**" : "") +
-                          (note is null ? "" : $"\nNote : {note}");
+            var summary = Summary(row.VehicleName, row.Plate, row.ClientName, row.Number, x!);
             await audit.LogAsync(me, "partner.validated", "sale", saleId.ToString(), $"🔧 Customisation validée · {p!.Name}", summary, $"/ventes/{saleId}");
             notifier.Enqueue(p!.ChannelId, DiscordNotifier.Embed($"✅ Customisation validée", summary + $"\n\n**Par :** {me.Name}",
                 DiscordNotifier.ColorGreen, footer: $"{p.Name} × Big Paulie", url: $"{opt.PublicUrl}/partenaire"));
+            return Results.Ok(new { ok = true });
+        }).RequirePerm(Permissions.PartnerValidate);
+
+        // Correction d'une customisation déjà validée (oubli, erreur de saisie) par le garage.
+        app.MapPut("/api/partner/validations/{id:guid}", async (Guid id, ValidateInput input, HttpContext http,
+            NpgsqlDataSource db, AuditService audit, DiscordNotifier notifier, PortalOptions opt) =>
+        {
+            var me = http.Me();
+            await using var c = await db.OpenConnectionAsync();
+            var (p, err) = await ResolvePartnerAsync(c, me, null);
+            if (err is not null) return err;
+            var (invalid, x) = Normalize(input);
+            if (invalid is not null) return EndpointAuth.Bad(invalid);
+
+            var row = await c.QuerySingleOrDefaultAsync<ValidationRow>($"""
+                SELECT pv.id, pv.partner_id, '' AS partner_name, s.id AS sale_id, s.number, s.vehicle_name, s.plate, {ClientNameSql} AS client_name,
+                       s.delivered_at, pv.amount, pv.note, pv.validated_at
+                FROM partner_validations pv JOIN sales s ON s.id = pv.sale_id JOIN clients c ON c.id = s.client_id
+                WHERE pv.id = @id AND pv.partner_id = @pid AND pv.cancelled_at IS NULL
+                """, new { id, pid = p!.Id });
+            if (row is null) return EndpointAuth.NotFound("Customisation introuvable (ou annulée par le Big Paulie).");
+
+            var args = new DynamicParameters(Params(x!, me.Id == Guid.Empty ? null : me.Id));
+            args.Add("id", id);
+            await c.ExecuteAsync("""
+                UPDATE partner_validations SET amount = @amount, note = @note, cosmetic = @cosmetic, cosmetic_amount = @cosmeticAmount,
+                       performance = @performance, performance_amount = @performanceAmount, engine = @engine, turbo = @turbo,
+                       transmission = @transmission, suspension = @suspension, brakes = @brakes, updated_by = @me, updated_at = now()
+                WHERE id = @id
+                """, args);
+
+            var summary = Summary(row.VehicleName, row.Plate, row.ClientName, row.Number, x!);
+            await audit.LogAsync(me, "partner.updated", "sale", row.SaleId.ToString(), $"🔧 Customisation modifiée · {p.Name}", summary, $"/ventes/{row.SaleId}");
+            notifier.Enqueue(p.ChannelId, DiscordNotifier.Embed("✏️ Customisation modifiée", summary + $"\n\n**Par :** {me.Name}",
+                DiscordNotifier.ColorSand, footer: $"{p.Name} × Big Paulie", url: $"{opt.PublicUrl}/partenaire"));
             return Results.Ok(new { ok = true });
         }).RequirePerm(Permissions.PartnerValidate);
 
@@ -210,21 +355,26 @@ public static partial class PartnerEndpoints
         {
             await using var c = await db.OpenConnectionAsync();
             var partners = await GetPartnersAsync(c, activeOnly: true);
-            var stats = (await c.QueryAsync<(Guid PartnerId, int Count30, decimal Amount30, int CountAll, decimal AmountAll)>("""
+            var stats = (await c.QueryAsync<StatsRow>("""
                 SELECT partner_id,
-                       count(*) FILTER (WHERE validated_at > now() - interval '30 days')::int,
-                       coalesce(sum(amount) FILTER (WHERE validated_at > now() - interval '30 days'), 0),
-                       count(*)::int, coalesce(sum(amount), 0)
+                       count(*) FILTER (WHERE validated_at > now() - interval '30 days')::int AS count30,
+                       coalesce(sum(amount) FILTER (WHERE validated_at > now() - interval '30 days'), 0) AS amount30,
+                       count(*)::int AS count_all, coalesce(sum(amount), 0) AS amount_all,
+                       coalesce(sum(cosmetic_amount) FILTER (WHERE validated_at > now() - interval '30 days'), 0) AS cosmetic30,
+                       coalesce(sum(performance_amount) FILTER (WHERE validated_at > now() - interval '30 days'), 0) AS performance30,
+                       coalesce(sum(cosmetic_amount), 0) AS cosmetic_all, coalesce(sum(performance_amount), 0) AS performance_all,
+                       count(*) FILTER (WHERE cosmetic)::int AS cosmetic_count, count(*) FILTER (WHERE performance)::int AS performance_count
                 FROM partner_validations WHERE cancelled_at IS NULL GROUP BY partner_id
                 """)).ToDictionary(x => x.PartnerId);
             var recent = await c.QueryAsync<ValidationRow>($"""
                 SELECT pv.id, pv.partner_id, p.name AS partner_name, s.id AS sale_id, s.number, s.vehicle_name, s.plate, {ClientNameSql} AS client_name,
-                       s.delivered_at, pv.amount, pv.note, pv.validated_at, u.display_name AS validated_by_name
+                       s.delivered_at, {ValidationCols}
                 FROM partner_validations pv
                 JOIN partners p ON p.id = pv.partner_id
                 JOIN sales s ON s.id = pv.sale_id
                 JOIN clients c ON c.id = s.client_id
                 LEFT JOIN users u ON u.id = pv.validated_by
+                LEFT JOIN users uu ON uu.id = pv.updated_by
                 WHERE pv.cancelled_at IS NULL
                 ORDER BY pv.validated_at DESC LIMIT 100
                 """);
@@ -239,9 +389,7 @@ public static partial class PartnerEndpoints
                     p.CategoryIds,
                     p.ClientTerms,
                     p.ContractTerms,
-                    stats = stats.TryGetValue(p.Id, out var st)
-                        ? new { count30 = st.Count30, amount30 = st.Amount30, countAll = st.CountAll, amountAll = st.AmountAll }
-                        : new { count30 = 0, amount30 = 0m, countAll = 0, amountAll = 0m },
+                    stats = stats.TryGetValue(p.Id, out var st) ? st : new StatsRow { PartnerId = p.Id },
                 }),
                 recent,
             });
