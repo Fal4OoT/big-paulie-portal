@@ -82,6 +82,33 @@ public sealed class GiftTier
     public List<string> Choices { get; set; } = new();
 }
 
+/// <summary>
+/// Thème de fête (décoration du portail). Dates au format MM-JJ, bornes incluses, heure de Paris ;
+/// une période peut passer d'une année à l'autre (27/12 → 02/01). Pâques : jours avant / après le dimanche de Pâques.
+/// </summary>
+public sealed class ThemeSetting
+{
+    public string Key { get; set; } = "";
+    public bool Enabled { get; set; } = true;
+    public string? Start { get; set; }
+    public string? End { get; set; }
+    public int? DaysBefore { get; set; }
+    public int? DaysAfter { get; set; }
+    /// <summary>Message du bandeau (vide = message par défaut).</summary>
+    public string? Message { get; set; }
+
+    public static readonly string[] Keys = { "christmas", "newyear", "valentine", "easter", "halloween" };
+
+    public static List<ThemeSetting> Defaults() => new()
+    {
+        new() { Key = "christmas", Start = "12-01", End = "12-26" },
+        new() { Key = "newyear", Start = "12-27", End = "01-02" },
+        new() { Key = "valentine", Start = "02-10", End = "02-14" },
+        new() { Key = "easter", DaysBefore = 3, DaysAfter = 1 },
+        new() { Key = "halloween", Start = "10-20", End = "11-01" },
+    };
+}
+
 public sealed class PortalSettings
 {
     public string? LogChannelId { get; set; }
@@ -155,6 +182,9 @@ public sealed class PortalSettings
     public bool BirthdayCouponEnabled { get; set; }
     public int BirthdayPercent { get; set; } = 10;
     public int? BirthdayExpiryDays { get; set; } = 30;
+
+    /// <summary>Thèmes de fête, chacun activable séparément.</summary>
+    public List<ThemeSetting> Themes { get; set; } = new();
 
     public string StatusLabel(string code) =>
         Statuses.FirstOrDefault(s => s.Code == code)?.Label ?? code;

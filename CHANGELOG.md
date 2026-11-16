@@ -3,6 +3,13 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.17.0 — 16/11/2026 · Thèmes de fête
+
+- **Nouveau** : thèmes de fête (Noël 01/12 → 26/12, Nouvel An 27/12 → 02/01, Saint-Valentin 10/02 → 14/02, Pâques 3 jours avant → lendemain du dimanche de Pâques calculé, Halloween 20/10 → 01/11) : bandeau, décoration du logo (bonnet de Noël…), particules animées en CSS qui ne captent aucun clic.
+- **Nouveau** : Configuration → Thèmes : activation par fête, dates (MM-JJ, périodes à cheval sur deux années possibles), message du bandeau, aperçu immédiat (onglet courant uniquement).
+- **Amélioration** : bouton « Animations : oui / non » par employé (mémorisé dans le navigateur) ; `prefers-reduced-motion` respecté.
+- Réglages stockés dans `settings.portal` (`themes`), sans migration.
+
 ## v1.16.0 — 16/11/2026 · Cadeau refusé
 
 - **Nouveau** : à la livraison, case « Le client ne veut pas de cadeau » : pas de cadeau remis (`sales.gift` vide), refus tracé (`sales.gift_declined`), affiché sur la fiche vente (« 🚫 Refusé par le client »), dans l'historique et les logs.

@@ -189,6 +189,18 @@ export interface PermissionInfo {
   group: string;
 }
 
+export interface ThemeSetting {
+  key: string;
+  enabled: boolean;
+  /** MM-JJ (bornes incluses, heure de Paris). */
+  start: string | null;
+  end: string | null;
+  /** Pâques : jours avant / après le dimanche de Pâques. */
+  daysBefore: number | null;
+  daysAfter: number | null;
+  message: string | null;
+}
+
 export interface PortalConfig {
   clientFields: FieldDefinition[];
   saleFields: FieldDefinition[];
@@ -200,6 +212,8 @@ export interface PortalConfig {
   giftsEnabled: boolean;
   giftTiers: GiftTier[];
   partners: PartnerPublic[];
+  /** Thèmes de fête activés. */
+  themes: ThemeSetting[];
 }
 
 export interface PartnerPublic {
@@ -519,6 +533,7 @@ export interface PortalSettings {
   birthdayCouponEnabled: boolean;
   birthdayPercent: number;
   birthdayExpiryDays: number | null;
+  themes: ThemeSetting[];
 }
 
 export interface AdminConfig {

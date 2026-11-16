@@ -46,3 +46,53 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .table-bp tbody tr {
   @apply transition-colors hover:bg-night-700/60;
 }
+
+/* ---------- Thèmes de fête : particules (ne captent aucun clic) ---------- */
+.bp-particle {
+  position: absolute;
+  top: -8vh;
+  opacity: 0.85;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+.bp-particle-inner {
+  display: inline-block;
+  animation: bp-sway 4s ease-in-out infinite alternate;
+}
+.bp-fall {
+  animation-name: bp-fall;
+  color: #f5f0e6;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.35);
+}
+.bp-confetti {
+  animation-name: bp-fall;
+}
+.bp-confetti .bp-particle-inner {
+  animation: bp-spin 2.4s linear infinite;
+}
+.bp-drift {
+  animation-name: bp-drift;
+  left: -10vw !important;
+  opacity: 0.7;
+}
+@keyframes bp-fall {
+  from { transform: translateY(0); }
+  to { transform: translateY(116vh); }
+}
+@keyframes bp-drift {
+  from { transform: translateX(0) translateY(0); }
+  50% { transform: translateX(60vw) translateY(-6vh); }
+  to { transform: translateX(125vw) translateY(4vh); }
+}
+@keyframes bp-sway {
+  from { transform: translateX(calc(var(--bp-sway, 30px) * -0.5)); }
+  to { transform: translateX(calc(var(--bp-sway, 30px) * 0.5)); }
+}
+@keyframes bp-spin {
+  from { transform: rotate(0deg) rotateX(0deg); }
+  to { transform: rotate(360deg) rotateX(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bp-fx { display: none; }
+}

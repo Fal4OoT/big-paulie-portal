@@ -26,6 +26,20 @@ public sealed class ConfigService
                 s.Statuses.Add(new StatusSetting { Code = code, Label = code, Color = "#888888" });
         s.Statuses = s.Statuses.Where(x => SaleStatus.IsValid(x.Code))
                                .OrderBy(x => Array.IndexOf(SaleStatus.All, x.Code)).ToList();
+
+        // Chaque thème de fête existe toujours (activé par défaut), dans l'ordre de l'année.
+        var themes = ThemeSetting.Defaults();
+        foreach (var t in themes)
+            if (s.Themes.FirstOrDefault(x => x.Key == t.Key) is { } saved)
+            {
+                t.Enabled = saved.Enabled;
+                t.Start = saved.Start ?? t.Start;
+                t.End = saved.End ?? t.End;
+                t.DaysBefore = saved.DaysBefore ?? t.DaysBefore;
+                t.DaysAfter = saved.DaysAfter ?? t.DaysAfter;
+                t.Message = saved.Message;
+            }
+        s.Themes = themes;
         return s;
     }
 

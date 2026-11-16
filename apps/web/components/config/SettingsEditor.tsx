@@ -4,7 +4,8 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { usePortal } from "@/lib/portal-context";
-import type { AdminConfig, GiftTier, PortalSettings } from "@/lib/types";
+import { PREVIEW_KEY, THEME_EVENT, themeDef, themePeriod, todayParis } from "@/lib/themes";
+import type { AdminConfig, GiftTier, PortalSettings, ThemeSetting } from "@/lib/types";
 import { Badge, Button, Card, Input, Label, Select, Toggle } from "../ui";
 import { SaveBar, stableJson } from "./SaveBar";
 
@@ -33,7 +34,7 @@ export function SettingsEditor({
 }: {
   admin: AdminConfig;
   onSaved: () => Promise<void>;
-  section?: "discord" | "advantages";
+  section?: "discord" | "advantages" | "themes";
 }) {
   const { reloadConfig } = usePortal();
   const [s, setS] = useState<PortalSettings>(admin.settings);
@@ -575,7 +576,127 @@ export function SettingsEditor({
 
       )}
 
+      {section === "themes" && (
+        <Card title="Thèmes de fête">
+          <p className="mb-4 text-sm text-cream-muted">
+            Pendant sa période (heure de Paris), le thème ajoute un bandeau, une décoration sur le logo et une animation légère. Chaque employé peut
+            couper l&apos;animation pour lui avec le bouton du bandeau. « Aperçu » montre le thème tout de suite, dans cet onglet du navigateur
+            uniquement.
+          </p>
+          <div className="space-y-3">
+            {s.themes.map((t, i) => (
+              <ThemeRow key={t.key} theme={t} onChange={(patch) => set({ themes: s.themes.map((x, j) => (j === i ? { ...x, ...patch } : x)) })} />
+            ))}
+          </div>
+        </Card>
+      )}
+
       <SaveBar dirty={dirty} saving={saving} error={error} done={done} onSave={save} onReset={() => setS(admin.settings)} />
     </div>
   );
 }
+
+const MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+/** Choix d'un jour + mois (valeur MM-JJ). */
+function MonthDay({ value, onChange }: { value: string | null; onChange: (v: string) => void }) {
+  const [m, d] = (value ?? "01-01").split("-");
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    <span className="inline-flex gap-1">
+      <Select value={Number(d)} onChange={(e) => onChange(`${m}-${pad(Number(e.target.value))}`)} className="w-20">
+        {Array.from({ length: 31 }, (_, i) => (
+          <option key={i} value={i + 1}>
+            {i + 1}
+          </option>
+        ))}
+      </Select>
+      <Select value={Number(m)} onChange={(e) => onChange(`${pad(Number(e.target.value))}-${d}`)} className="w-28">
+        {MONTHS.map((label, i) => (
+          <option key={label} value={i + 1}>
+            {label}
+          </option>
+        ))}
+      </Select>
+    </span>
+  );
+}
+
+function ThemeRow({ theme, onChange }: { theme: ThemeSetting; onChange: (patch: Partial<ThemeSetting>) => void }) {
+  const def = themeDef(theme.key);
+  if (!def) return null;
+  const today = todayParis();
+  const period = themePeriod(theme, today);
+  const fr = (ymd: string) => `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}/${ymd.slice(0, 4)}`;
+  const running = !!period && period[0] <= today && today <= period[1];
+
+  function preview() {
+    try {
+      sessionStorage.setItem(PREVIEW_KEY, JSON.stringify({ ...theme, enabled: true }));
+    } catch {
+      /* stockage indisponible */
+    }
+    window.dispatchEvent(new Event(THEME_EVENT));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  return (
+    <div className={`rounded-lg border p-4 ${theme.enabled ? "border-night-500/70 bg-night-900/50" : "border-night-600 bg-night-900/20 opacity-80"}`}>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="h-6 w-1.5 rounded-full" style={{ background: def.gradient }} aria-hidden />
+        <Toggle checked={theme.enabled} onChange={(v) => onChange({ enabled: v })} label={<span className="font-medium">{def.emoji} {def.label}</span>} />
+        {theme.enabled && running && <Badge color="#2F7D53">En ce moment</Badge>}
+        <Button type="button" size="sm" variant="ghost" onClick={preview} className="ml-auto">
+          Aperçu
+        </Button>
+      </div>
+      <div className="mt-3 grid gap-4 lg:grid-cols-[auto_1fr]">
+        <div>
+          <Label>Période</Label>
+          {theme.key === "easter" ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-cream-muted">
+              <Input
+                type="number"
+                min={0}
+                max={30}
+                value={theme.daysBefore ?? 0}
+                onChange={(e) => onChange({ daysBefore: Math.max(0, Math.min(30, Number(e.target.value) || 0)) })}
+                className="w-20"
+              />
+              jours avant et
+              <Input
+                type="number"
+                min={0}
+                max={30}
+                value={theme.daysAfter ?? 0}
+                onChange={(e) => onChange({ daysAfter: Math.max(0, Math.min(30, Number(e.target.value) || 0)) })}
+                className="w-20"
+              />
+              jours après le dimanche de Pâques
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-cream-muted">
+              du <MonthDay value={theme.start} onChange={(v) => onChange({ start: v })} /> au{" "}
+              <MonthDay value={theme.end} onChange={(v) => onChange({ end: v })} />
+            </div>
+          )}
+          {period && (
+            <p className="mt-1 text-xs text-cream-dim">
+              {running ? "En cours" : "Prochaine fois"} : du {fr(period[0])} au {fr(period[1])}
+            </p>
+          )}
+        </div>
+        <div>
+          <Label>Message du bandeau</Label>
+          <Input
+            value={theme.message ?? ""}
+            maxLength={120}
+            placeholder={def.defaultMessage}
+            onChange={(e) => onChange({ message: e.target.value || null })}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+

@@ -22,6 +22,7 @@ const TABS = [
   { key: "catalog", label: "Catalogue" },
   { key: "discord", label: "Discord, tournée & statuts" },
   { key: "advantages", label: "Avantages clients" },
+  { key: "themes", label: "Thèmes" },
   { key: "members", label: "Membres" },
 ] as const;
 
@@ -78,11 +79,13 @@ export default function ConfigurationPage() {
       {tab === "vehicles" && <VehiclesEditor />}
       {tab === "catalog" && <CatalogEditor />}
       {tab === "members" && <MembersList />}
-      {(tab === "grades" || tab === "discord" || tab === "advantages") &&
+      {(tab === "grades" || tab === "discord" || tab === "advantages" || tab === "themes") &&
         (!admin ? (
           <Spinner />
         ) : tab === "grades" ? (
           <GradesEditor admin={admin} onSaved={loadAdmin} />
+        ) : tab === "themes" ? (
+          <SettingsEditor admin={admin} onSaved={loadAdmin} section="themes" />
         ) : tab === "advantages" ? (
           <div className="space-y-6">
             <SettingsEditor admin={admin} onSaved={loadAdmin} section="advantages" />

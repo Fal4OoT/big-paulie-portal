@@ -4,12 +4,14 @@ import { BarChart3, Car, ClipboardList, GraduationCap, Handshake, LayoutDashboar
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { LogoDecoration, ThemeBanner, ThemeEffects } from "@/components/SeasonalTheme";
 import { Spinner } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { CURRENT_VERSION, SEEN_VERSION_KEY } from "@/lib/changelog";
 import { cn } from "@/lib/format";
 import { PERM, PortalContext } from "@/lib/portal-context";
-import type { Me, PortalConfig } from "@/lib/types";
+import { activeTheme, FX_KEY, PREVIEW_KEY, THEME_EVENT } from "@/lib/themes";
+import type { Me, PortalConfig, ThemeSetting } from "@/lib/types";
 
 const NAV = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard, perm: PERM.salesView },
@@ -31,6 +33,47 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
   const [fatal, setFatal] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [unseen, setUnseen] = useState(false);
+  // Thème de fête : aperçu forcé depuis la Configuration (cet onglet uniquement) et animations coupées (ce navigateur).
+  const [preview, setPreview] = useState<ThemeSetting | null>(null);
+  const [fx, setFx] = useState(true);
+
+  useEffect(() => {
+    const read = () => {
+      try {
+        const raw = sessionStorage.getItem(PREVIEW_KEY);
+        setPreview(raw ? (JSON.parse(raw) as ThemeSetting) : null);
+      } catch {
+        setPreview(null);
+      }
+      try {
+        setFx(localStorage.getItem(FX_KEY) !== "off");
+      } catch {
+        setFx(true);
+      }
+    };
+    read();
+    window.addEventListener(THEME_EVENT, read);
+    return () => window.removeEventListener(THEME_EVENT, read);
+  }, []);
+
+  function toggleFx() {
+    const next = !fx;
+    setFx(next);
+    try {
+      localStorage.setItem(FX_KEY, next ? "on" : "off");
+    } catch {
+      /* sans importance */
+    }
+  }
+
+  function stopPreview() {
+    try {
+      sessionStorage.removeItem(PREVIEW_KEY);
+    } catch {
+      /* sans importance */
+    }
+    setPreview(null);
+  }
 
   // Point « nouveau » tant que la version actuelle n'a pas été consultée.
   useEffect(() => {
@@ -88,6 +131,7 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
   // Actif sur l'adresse exacte ou ses sous-pages (« /partenaires » n'active pas « /partenaire »).
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
   const topGrade = me.grades[0]?.name ?? (me.isAdmin ? "Administrateur" : "");
+  const theme = preview ?? activeTheme(config.themes ?? []);
 
   async function logout() {
     await api.post("/api/auth/logout").catch(() => undefined);
@@ -97,8 +141,11 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
   const sidebar = (
     <div className="flex h-full flex-col">
       <Link href="/" className="flex items-center gap-3 px-5 py-5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-256.png" alt="" className="h-12 w-12" />
+        <span className="relative shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-256.png" alt="" className="h-12 w-12" />
+          <LogoDecoration theme={theme} />
+        </span>
         <div className="leading-tight">
           <div className="font-display text-xl uppercase tracking-wide">Big Paulie</div>
           <div className="text-[11px] uppercase tracking-[0.22em] text-sand">Logistique</div>
@@ -192,6 +239,7 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
 
         <main className="min-w-0 flex-1 px-4 pb-16 pt-20 sm:px-8 lg:pt-10">
           <div className="mx-auto max-w-7xl">
+            {theme && <ThemeBanner theme={theme} fx={fx} onToggleFx={toggleFx} preview={!!preview} onStopPreview={stopPreview} />}
             {nav.length === 0 ? (
               <div className="flex items-center gap-2 text-cream-muted">
                 <ClipboardList className="h-4 w-4" /> Aucun accès configuré pour ton grade.
@@ -202,6 +250,7 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
           </div>
         </main>
       </div>
+      {theme && fx && <ThemeEffects key={theme.key} theme={theme} />}
     </PortalContext.Provider>
   );
 }

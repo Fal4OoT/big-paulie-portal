@@ -18,6 +18,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.17.0",
+    date: "2026-11-16",
+    title: "Thèmes de fête",
+    changes: [
+      { kind: "nouveau", text: "Thèmes de fête : Noël 🎄, Nouvel An 🎆, Saint-Valentin 💘, Pâques 🐣 et Halloween 🎃. Bandeau festif, décoration sur le logo et animation légère (neige, confettis, cœurs, chauves-souris…)." },
+      { kind: "nouveau", text: "Configuration → Thèmes : un bouton par fête, dates et message du bandeau modifiables, bouton « Aperçu » pour voir le thème tout de suite." },
+      { kind: "amélioration", text: "Chaque employé peut couper les animations pour lui depuis le bandeau. Elles sont aussi coupées si l'ordinateur demande moins d'animations." },
+    ],
+  },
+  {
     version: "1.16.0",
     date: "2026-11-16",
     title: "Cadeau refusé",

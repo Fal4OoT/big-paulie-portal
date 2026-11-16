@@ -63,7 +63,11 @@ public static partial class ConfigEndpoints
         public bool BirthdayCouponEnabled { get; set; }
         public int BirthdayPercent { get; set; } = 10;
         public int? BirthdayExpiryDays { get; set; } = 30;
+        public List<ThemeSetting>? Themes { get; set; }
     }
+
+    [GeneratedRegex("^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$")]
+    private static partial Regex MonthDayRegex();
 
     public sealed class RecapTestInput
     {
@@ -107,6 +111,7 @@ public static partial class ConfigEndpoints
                 referralEnabled = settings.ReferralEnabled,
                 giftsEnabled = settings.GiftsEnabled,
                 giftTiers = settings.GiftTiers,
+                themes = settings.Themes.Where(t => t.Enabled),
                 partners = partners.Select(p => new { p.Id, p.Name, p.DiscountPercent, p.WindowHours, p.CategoryIds, p.ClientTerms }),
             });
         }).RequirePerm();
@@ -462,6 +467,34 @@ public static partial class ConfigEndpoints
             s.BirthdayCouponEnabled = input.BirthdayCouponEnabled;
             s.BirthdayPercent = input.BirthdayPercent;
             s.BirthdayExpiryDays = input.BirthdayExpiryDays;
+
+            if (input.Themes is not null)
+            {
+                foreach (var t in input.Themes)
+                {
+                    var target = s.Themes.FirstOrDefault(x => x.Key == t.Key);
+                    if (target is null) continue;
+                    if (t.Key == "easter")
+                    {
+                        if (t.DaysBefore is < 0 or > 30 || t.DaysAfter is < 0 or > 30)
+                            return EndpointAuth.Bad("Thème de Pâques : entre 0 et 30 jours avant et après.");
+                        target.DaysBefore = t.DaysBefore ?? target.DaysBefore;
+                        target.DaysAfter = t.DaysAfter ?? target.DaysAfter;
+                    }
+                    else
+                    {
+                        foreach (var d in new[] { t.Start, t.End })
+                            if (d is null || !MonthDayRegex().IsMatch(d) || !DateOnly.TryParseExact($"2024-{d}", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _))
+                                return EndpointAuth.Bad("Thèmes : dates au format MM-JJ (ex : 12-01).");
+                        target.Start = t.Start;
+                        target.End = t.End;
+                    }
+                    var message = t.Message?.Trim();
+                    if (message is { Length: > 120 }) return EndpointAuth.Bad("Thèmes : message du bandeau de 120 caractères maximum.");
+                    target.Message = string.IsNullOrEmpty(message) ? null : message;
+                    target.Enabled = t.Enabled;
+                }
+            }
 
             await config.SaveSettingsAsync(s);
             http.RefreshTourBoard(); // salon, libellés ou seuil de retard ont pu changer
