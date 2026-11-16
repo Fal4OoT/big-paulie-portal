@@ -33,6 +33,7 @@ export default function SalePage() {
   const [deliverOpen, setDeliverOpen] = useState(false);
   const [plate, setPlate] = useState("");
   const [giftChoice, setGiftChoice] = useState<string | null>(null);
+  const [giftDeclined, setGiftDeclined] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -55,7 +56,7 @@ export default function SalePage() {
     void load();
   }, [load]);
 
-  async function changeStatus(to: StatusCode, extra?: { plate?: string; note?: string; giftChoice?: string | null }) {
+  async function changeStatus(to: StatusCode, extra?: { plate?: string; note?: string; giftChoice?: string | null; giftDeclined?: boolean }) {
     setBusy(true);
     setError(null);
     try {
@@ -89,6 +90,7 @@ export default function SalePage() {
     // La fenêtre de livraison s'ouvre s'il faut une plaque ou s'il y a un cadeau à remettre.
     if (next === "DELIVERED" && (sale!.requiresPlate || gift || partners.length > 0)) {
       setGiftChoice(null);
+      setGiftDeclined(false);
       setDeliverOpen(true);
     }
     else void changeStatus(next);
@@ -238,6 +240,8 @@ export default function SalePage() {
             <Info label="Cadeau">
               {sale.gift ? (
                 <span>🎁 {sale.gift}</span>
+              ) : sale.giftDeclined ? (
+                <span className="text-cream-muted">🚫 Refusé par le client (aucun cadeau remis)</span>
               ) : gift ? (
                 <span className="text-amber-100">🎁 Prévu à la livraison : {gift.label}{gift.choices.length > 0 ? ` (${gift.choices.join(" / ")})` : ""}</span>
               ) : (
@@ -374,11 +378,15 @@ export default function SalePage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (gift && gift.choices.length > 0 && !giftChoice) {
-              setError(`Choisis le cadeau : ${gift.choices.join(" ou ")}.`);
+            if (gift && gift.choices.length > 0 && !giftChoice && !giftDeclined) {
+              setError(`Choisis le cadeau : ${gift.choices.join(" ou ")}, ou coche « Le client ne veut pas de cadeau ».`);
               return;
             }
-            void changeStatus("DELIVERED", { plate: sale.requiresPlate ? plate : undefined, giftChoice });
+            void changeStatus("DELIVERED", {
+              plate: sale.requiresPlate ? plate : undefined,
+              giftChoice: giftDeclined ? null : giftChoice,
+              giftDeclined: !!gift && giftDeclined,
+            });
           }}
           className="space-y-4"
         >
@@ -404,11 +412,11 @@ export default function SalePage() {
             </div>
           )}
           {gift && (
-            <div className="rounded-lg border border-sand/60 bg-sand/10 px-4 py-3">
-              <div className="flex items-center gap-2 font-semibold text-amber-100">
+            <div className={cn("rounded-lg border px-4 py-3", giftDeclined ? "border-night-500 bg-night-900/50" : "border-sand/60 bg-sand/10")}>
+              <div className={cn("flex items-center gap-2 font-semibold", giftDeclined ? "text-cream-dim line-through" : "text-amber-100")}>
                 <Gift className="h-5 w-5 text-sand" /> Cadeau à remettre : {gift.label}
               </div>
-              {gift.choices.length > 0 && (
+              {gift.choices.length > 0 && !giftDeclined && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {gift.choices.map((ch) => (
                     <button
@@ -425,6 +433,18 @@ export default function SalePage() {
                   ))}
                 </div>
               )}
+              <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-cream-muted">
+                <input
+                  type="checkbox"
+                  checked={giftDeclined}
+                  onChange={(e) => {
+                    setGiftDeclined(e.target.checked);
+                    setGiftChoice(null);
+                  }}
+                  className="h-4 w-4 accent-[#D9A441]"
+                />
+                Le client ne veut pas de cadeau (aucun cadeau remis)
+              </label>
             </div>
           )}
           <ErrorBox message={error} />

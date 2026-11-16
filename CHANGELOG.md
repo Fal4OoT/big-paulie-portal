@@ -3,6 +3,11 @@
 Numérotation `X.Y.Z` : **X** refonte, **Y** nouvelle fonctionnalité, **Z** correction.
 Chaque version correspond à un tag git `vX.Y.Z`. Les mêmes notes sont visibles dans le portail (menu **Nouveautés**, fichier `apps/web/lib/changelog.ts`).
 
+## v1.16.0 — 16/11/2026 · Cadeau refusé
+
+- **Nouveau** : à la livraison, case « Le client ne veut pas de cadeau » : pas de cadeau remis (`sales.gift` vide), refus tracé (`sales.gift_declined`), affiché sur la fiche vente (« 🚫 Refusé par le client »), dans l'historique et les logs.
+- **Base** : migration `012_gift_declined`.
+
 ## v1.15.0 — 11/11/2026 · Détail des customisations
 
 - **Nouveau** : validation partenaire détaillée, tout facultatif : Cosmétique (+ montant), Performance (+ montant, Moteur / Transmission / Suspension / Freins niveau 1 à 6, Turbo). Bouton « Full perf ».

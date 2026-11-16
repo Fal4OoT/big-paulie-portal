@@ -202,6 +202,8 @@ public sealed class SaleView
     public int? CouponPercent { get; set; }
     public string? CouponReason { get; set; }
     public string? Gift { get; set; }
+    /// <summary>Le client a refusé le cadeau de livraison.</summary>
+    public bool GiftDeclined { get; set; }
     public string? Plate { get; set; }
     public string Status { get; set; } = "";
     public bool PermitWarning { get; set; }

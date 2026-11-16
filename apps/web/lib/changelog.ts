@@ -18,6 +18,14 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: "1.16.0",
+    date: "2026-11-16",
+    title: "Cadeau refusé",
+    changes: [
+      { kind: "nouveau", text: "Livraison : case « Le client ne veut pas de cadeau ». Aucun cadeau n'est enregistré comme remis, et le refus est indiqué sur la fiche de la vente, dans l'historique et dans les logs." },
+    ],
+  },
+  {
     version: "1.15.0",
     date: "2026-11-11",
     title: "Détail des customisations",

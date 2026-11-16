@@ -383,6 +383,8 @@ export interface Sale {
   couponPercent: number | null;
   couponReason: string | null;
   gift: string | null;
+  /** Le client a refusé le cadeau de livraison. */
+  giftDeclined: boolean;
   plate: string | null;
   status: StatusCode;
   permitWarning: boolean;
